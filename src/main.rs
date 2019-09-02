@@ -8,6 +8,7 @@ use console::Term;
 use geo::algorithm::bounding_rect::BoundingRect;
 use geo_types::{Line, LineString, MultiLineString, MultiPolygon, Polygon};
 use geojson::{GeoJson, Geometry, Value};
+use indicatif::ProgressBar;
 use num_traits::{Float, FromPrimitive};
 use rstar::{RTree, RTreeNum};
 
@@ -65,33 +66,44 @@ fn process_geojson<T: Float + RTreeNum + FromPrimitive>(gj: GeoJson) -> Vec<Line
     }
 }
 
-fn run_grid(geojson_str: String) {
-    // TODO: Figure out if this can be sped up
-    let gj: GeoJson = geojson_str.parse::<GeoJson>().unwrap();
-    let mut lines: Vec<Line<f64>> = process_geojson(gj);
-    let ls: LineString<f64> =
-        LineString::from_iter(lines.iter_mut().flat_map(|l| vec![l.start, l.end]));
-    let rect = ls.bounding_rect().unwrap();
-    let rtree: RTree<Line<f64>> = RTree::bulk_load_parallel(lines);
-
-    let (height, width) = Term::stdout().size();
-    let grid = MapGrid::new(width as f64, height as f64, rect, rtree);
-    grid.print();
-}
-
 fn main() {
     let file_path = env::args()
         .nth(1)
         .expect("Must supply a file path or '-' to read stdin");
-    let geojson_str = match file_path.as_ref() {
+
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_message("Reading file");
+    spinner.enable_steady_tick(1);
+
+    let mut geojson_str = String::new();
+    match file_path.as_ref() {
         "-" => {
-            let mut buffer = String::new();
             io::stdin()
-                .read_to_string(&mut buffer)
+                .read_to_string(&mut geojson_str)
                 .expect("There was an error reading from stdin");
-            buffer
         }
-        _ => fs::read_to_string(file_path).expect("There was an error reading your file"),
+        _ => {
+            fs::File::open(file_path)
+                .unwrap()
+                .read_to_string(&mut geojson_str)
+                .expect("There was an error reading your file");
+        }
     };
-    run_grid(geojson_str);
+
+    spinner.set_message("Parsing geography");
+    let gj: GeoJson = geojson_str.parse::<GeoJson>().unwrap();
+    let mut lines: Vec<Line<f64>> = process_geojson(gj);
+
+    // Create a combined LineString for bounds calculation
+    let ls: LineString<f64> =
+        LineString::from_iter(lines.iter_mut().flat_map(|l| vec![l.start, l.end]));
+
+    spinner.set_message("Indexing geography");
+    let rect = ls.bounding_rect().unwrap();
+    let rtree: RTree<Line<f64>> = RTree::bulk_load_parallel(lines);
+
+    let (height, width) = Term::stdout().size();
+    let grid = MapGrid::new(width as f64, (height - 1) as f64, rect, rtree);
+    spinner.finish_and_clear();
+    grid.print();
 }

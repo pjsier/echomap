@@ -1,4 +1,5 @@
 use std::char;
+use std::io::{self, Write};
 
 use geo::algorithm::intersects::Intersects;
 use geo_types::{Line, Point, Polygon, Rect};
@@ -56,13 +57,16 @@ where
 
     /// Iterate through cells, printing one line at a time
     pub fn print(&self) {
+        let stdout = io::stdout();
+        let mut handle = io::BufWriter::new(stdout.lock());
+
         for r in 0..self.rows {
             let mut row_str = "".to_string();
             for c in 0..self.cols {
                 let cell_value = self.query_cell_value(r, c);
                 row_str.push_str(&Self::braille_char(cell_value).to_string());
             }
-            println!("{}", row_str);
+            writeln!(handle, "{}", row_str).expect("Error printing line");
         }
     }
 
