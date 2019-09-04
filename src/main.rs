@@ -1,9 +1,11 @@
 use std::convert::TryInto;
-use std::env;
 use std::fs;
 use std::io::{self, Read};
 use std::iter::FromIterator;
 
+extern crate clap;
+
+use clap::{App, Arg};
 use console::Term;
 use geo::algorithm::bounding_rect::BoundingRect;
 use geo_types::{Line, LineString, MultiLineString, MultiPolygon, Polygon};
@@ -67,15 +69,34 @@ fn process_geojson<T: Float + RTreeNum + FromPrimitive>(gj: GeoJson) -> Vec<Line
 }
 
 fn main() {
-    let file_path = env::args()
-        .nth(1)
-        .expect("Must supply a file path or '-' to read stdin");
+    let matches = App::new("echomap")
+        .version("0.1.0")
+        .about("Preview map files in the console")
+        .author("Pat Sier <pjsier@gmail.com>")
+        .arg(Arg::with_name("INPUT")
+            .help("File to parse or '-' to read stdin")
+            .required(true)
+            .index(1))
+        .arg(Arg::with_name("rows")
+            .short("r")
+            .long("rows")
+            .value_name("ROWS")
+            .help("Sets the number of rows (in characters) of the printed output. Defaults to terminal width.")
+            .takes_value(true))
+        .arg(Arg::with_name("columns")
+            .short("c")
+            .long("columns")
+            .value_name("COLUMNS")
+            .help("Sets the number of columns (in characters) of the printed output. Defaults to terminal height minus 1.")
+            .takes_value(true))
+        .get_matches();
 
     let spinner = ProgressBar::new_spinner();
     spinner.set_message("Reading file");
     spinner.enable_steady_tick(1);
 
     let mut geojson_str = String::new();
+    let file_path = matches.value_of("INPUT").unwrap();
     match file_path.as_ref() {
         "-" => {
             io::stdin()
@@ -102,8 +123,16 @@ fn main() {
     let rect = ls.bounding_rect().unwrap();
     let rtree: RTree<Line<f64>> = RTree::bulk_load_parallel(lines);
 
-    let (height, width) = Term::stdout().size();
-    let grid = MapGrid::new(width as f64, (height - 1) as f64, rect, rtree);
+    let (term_height, term_width) = Term::stdout().size();
+    let height: f64 = match matches.value_of("rows") {
+        Some(ref rows) => rows.parse().expect("Rows cannot be parsed as a number."),
+        None => (term_height - 1) as f64,
+    };
+    let width: f64 = match matches.value_of("columns") {
+        Some(ref cols) => cols.parse().expect("Columns cannot be parsed as a number."),
+        None => term_width as f64,
+    };
+    let grid = MapGrid::new(width, height, rect, rtree);
     spinner.finish_and_clear();
     grid.print();
 }

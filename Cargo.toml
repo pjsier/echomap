@@ -1,7 +1,11 @@
 [package]
 name = "echomap"
 version = "0.1.0"
-authors = ["pjsier <pjsier@gmail.com>"]
+authors = ["Pat Sier <pjsier@gmail.com>"]
+description = "A command line tool for previewing map files in the console"
+readme = "README.md"
+repository = "https://github.com/pjsier/echomap"
+license = "MIT"
 edition = "2018"
 
 [dependencies]
@@ -12,3 +16,8 @@ num-traits = "0.2"
 rstar = "0.2.0"
 console = "0.8.0"
 indicatif = "0.11.0"
+clap = "2.33.0"
+
+[[bin]]
+name = "echomap"
+path = "src/main.rs"
