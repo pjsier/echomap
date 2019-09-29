@@ -1,10 +1,34 @@
 use std::char;
 use std::io::{self, Write};
 
+use geo::algorithm::bounding_rect::BoundingRect;
 use geo::algorithm::intersects::Intersects;
-use geo_types::{Line, Point, Polygon, Rect};
+use geo_types::{CoordinateType, Line, Point, Polygon, Rect};
 use num_traits::{Float, FromPrimitive};
-use rstar::{RTree, RTreeNum, AABB};
+use rstar::{self, RTree, RTreeNum, RTreeObject, AABB};
+
+pub enum GridGeom<T>
+where
+    T: CoordinateType + Float + RTreeNum + FromPrimitive,
+{
+    Line(Line<T>),
+    Polygon(Polygon<T>),
+}
+
+impl<T> RTreeObject for GridGeom<T>
+where
+    T: CoordinateType + Float + RTreeNum + FromPrimitive,
+{
+    type Envelope = AABB<[T; 2]>;
+
+    fn envelope(&self) -> Self::Envelope {
+        let rect = match self {
+            GridGeom::Line(line) => line.bounding_rect(),
+            GridGeom::Polygon(poly) => poly.bounding_rect().unwrap(),
+        };
+        AABB::from_corners([rect.min.x, rect.min.y], [rect.max.x, rect.max.y])
+    }
+}
 
 pub struct MapGrid<T>
 where
@@ -14,14 +38,14 @@ where
     cols: i32,
     bbox: Rect<T>,
     cellsize: [f64; 2],
-    rtree: RTree<Line<T>>,
+    rtree: RTree<GridGeom<T>>,
 }
 
 impl<T> MapGrid<T>
 where
     T: Float + RTreeNum + FromPrimitive,
 {
-    pub fn new(width: f64, height: f64, bbox: Rect<T>, rtree: RTree<Line<T>>) -> MapGrid<T> {
+    pub fn new(width: f64, height: f64, bbox: Rect<T>, rtree: RTree<GridGeom<T>>) -> MapGrid<T> {
         let box_width = bbox.width().to_f64().unwrap();
         let box_height = bbox.height().to_f64().unwrap();
 
@@ -96,18 +120,22 @@ where
                 let min_pt = Point::new(T::from_f64(cell_min_x).unwrap(), cell_min_y);
                 let max_pt = Point::new(cell_max_x, T::from_f64(cell_max_y).unwrap());
 
-                let envelope = AABB::from_corners(min_pt, max_pt);
+                let envelope =
+                    AABB::from_corners([min_pt.x(), min_pt.y()], [max_pt.x(), max_pt.y()]);
                 let rect_poly = Polygon::from(Rect::new(min_pt, max_pt));
 
                 // Find all intersecting envelopes, check if the underlying lines intersect
                 let envelope_intersect = self.rtree.locate_in_envelope_intersecting(&envelope);
-                let intersecting_lines: Vec<&Line<T>> = envelope_intersect
+                let intersecting_geoms: Vec<&GridGeom<T>> = envelope_intersect
                     .into_iter()
-                    .skip_while(|l| !rect_poly.intersects(*l))
+                    .skip_while(|l| match l {
+                        GridGeom::Line(line) => !rect_poly.intersects(line),
+                        GridGeom::Polygon(poly) => !rect_poly.intersects(poly),
+                    })
                     .collect();
 
                 // Add the associated cell value if intersecting lines are found
-                if intersecting_lines.len() > 0 {
+                if intersecting_geoms.len() > 0 {
                     cell_value = cell_value + Self::braille_cell_value(r, c);
                 }
             }

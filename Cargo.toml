@@ -9,11 +9,11 @@ license = "MIT"
 edition = "2018"
 
 [dependencies]
-geo = "0.12.1"
-geo-types = { version = "0.4.2", features = ["rstar"] }
-geojson = { version = "0.16.0", features = ["geo-types"] }
+geo = "0.12"
+geo-types = { version = "0.4", features = ["rstar"] }
+geojson = { version = "0.16", features = ["geo-types"] }
 num-traits = "0.2"
-rstar = "0.2.0"
+rstar = "0.5"
 console = "0.8.0"
 indicatif = "0.11.0"
 clap = "2.33.0"

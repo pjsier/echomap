@@ -1,43 +1,43 @@
 use std::convert::TryInto;
 use std::fs;
 use std::io::{self, Read};
-use std::iter::FromIterator;
 
 extern crate clap;
 
 use clap::{App, Arg};
 use console::Term;
-use geo::algorithm::bounding_rect::BoundingRect;
-use geo_types::{Line, LineString, MultiLineString, MultiPolygon, Polygon};
+use geo_types::{LineString, MultiLineString, MultiPolygon, Polygon, Rect};
 use geojson::{GeoJson, Geometry, Value};
 use indicatif::ProgressBar;
 use num_traits::{Float, FromPrimitive};
 use rstar::{RTree, RTreeNum};
 
 pub mod map_grid;
-use map_grid::MapGrid;
+use map_grid::{GridGeom, MapGrid};
 
 /// Process GeoJSON geometries
-fn match_geometry<T: Float + RTreeNum + FromPrimitive>(geom: Geometry) -> Vec<Line<T>> {
+fn match_geometry<T: Float + RTreeNum + FromPrimitive>(geom: Geometry) -> Vec<GridGeom<T>> {
     match geom.value {
         Value::LineString(_) => {
             let ls: LineString<T> = geom.value.try_into().unwrap();
-            ls.lines().collect()
+            ls.lines().map(|l| GridGeom::Line(l)).collect()
         }
         Value::Polygon(_) => {
             let poly: Polygon<T> = geom.value.try_into().unwrap();
-            poly.exterior().lines().collect()
+            poly.exterior().lines().map(|l| GridGeom::Line(l)).collect()
         }
         Value::MultiLineString(_) => {
             let ml: MultiLineString<T> = geom.value.try_into().unwrap();
             ml.into_iter()
                 .flat_map(|ls| ls.lines().collect::<Vec<_>>())
+                .map(|l| GridGeom::Line(l))
                 .collect()
         }
         Value::MultiPolygon(_) => {
             let mp: MultiPolygon<T> = geom.value.try_into().unwrap();
             mp.into_iter()
                 .flat_map(|geometry| geometry.exterior().lines().collect::<Vec<_>>())
+                .map(|l| GridGeom::Line(l))
                 .collect()
         }
         Value::GeometryCollection(collection) => collection
@@ -49,7 +49,7 @@ fn match_geometry<T: Float + RTreeNum + FromPrimitive>(geom: Geometry) -> Vec<Li
 }
 
 /// Process top-level GeoJSON items
-fn process_geojson<T: Float + RTreeNum + FromPrimitive>(gj: GeoJson) -> Vec<Line<T>> {
+fn process_geojson<T: Float + RTreeNum + FromPrimitive>(gj: GeoJson) -> Vec<GridGeom<T>> {
     match gj {
         GeoJson::FeatureCollection(collection) => collection
             .features
@@ -77,6 +77,24 @@ fn main() {
             .help("File to parse or '-' to read stdin")
             .required(true)
             .index(1))
+        .arg(Arg::with_name("format")
+            .short("f")
+            .long("format")
+            .value_name("FORMAT")
+            .help("Input file format")
+            .possible_values(&["geojson", "csv"])
+            .default_value("geojson")
+            .takes_value(true))
+        .arg(Arg::with_name("lon")
+            .long("lon")
+            .value_name("LON")
+            .takes_value(true)
+            .default_value_if("format", Some("csv"), "lon"))
+        .arg(Arg::with_name("lat")
+            .long("lat")
+            .value_name("LAT")
+            .takes_value(true)
+            .default_value_if("format", Some("csv"), "lat"))
         .arg(Arg::with_name("rows")
             .short("r")
             .long("rows")
@@ -95,33 +113,36 @@ fn main() {
     spinner.set_message("Reading file");
     spinner.enable_steady_tick(1);
 
-    let mut geojson_str = String::new();
+    let mut input_str = String::new();
     let file_path = matches.value_of("INPUT").unwrap();
     match file_path.as_ref() {
         "-" => {
             io::stdin()
-                .read_to_string(&mut geojson_str)
+                .read_to_string(&mut input_str)
                 .expect("There was an error reading from stdin");
         }
         _ => {
             fs::File::open(file_path)
                 .unwrap()
-                .read_to_string(&mut geojson_str)
+                .read_to_string(&mut input_str)
                 .expect("There was an error reading your file");
         }
     };
 
     spinner.set_message("Parsing geography");
-    let gj: GeoJson = geojson_str.parse::<GeoJson>().unwrap();
-    let mut lines: Vec<Line<f64>> = process_geojson(gj);
+    let gj_result: Result<GeoJson, _> = match matches.value_of("format").unwrap() {
+        "geojson" => input_str.parse::<GeoJson>(),
+        "csv" => input_str.parse::<GeoJson>(),
+        _ => panic!("Invalid format supplied"),
+    };
+    let gj: GeoJson = gj_result.expect("Unable to parse geograpy");
+    let geoms: Vec<GridGeom<f64>> = process_geojson(gj);
 
     // Create a combined LineString for bounds calculation
-    let ls: LineString<f64> =
-        LineString::from_iter(lines.iter_mut().flat_map(|l| vec![l.start, l.end]));
-
     spinner.set_message("Indexing geography");
-    let rect = ls.bounding_rect().unwrap();
-    let rtree: RTree<Line<f64>> = RTree::bulk_load_parallel(lines);
+    let rtree: RTree<GridGeom<f64>> = RTree::bulk_load(geoms);
+    let envelope = rtree.root().envelope();
+    let rect = Rect::new(envelope.lower(), envelope.upper());
 
     let (term_height, term_width) = Term::stdout().size();
     let height: f64 = match matches.value_of("rows") {
