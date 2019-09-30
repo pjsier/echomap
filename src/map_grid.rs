@@ -1,6 +1,7 @@
 use std::char;
 use std::io::{self, Write};
 
+use geo::algorithm::contains::Contains;
 use geo::algorithm::bounding_rect::BoundingRect;
 use geo::algorithm::intersects::Intersects;
 use geo_types::{CoordinateType, Line, Point, Polygon, Rect};
@@ -11,6 +12,7 @@ pub enum GridGeom<T>
 where
     T: CoordinateType + Float + RTreeNum + FromPrimitive,
 {
+    Point(Point<T>),
     Line(Line<T>),
     Polygon(Polygon<T>),
 }
@@ -22,11 +24,17 @@ where
     type Envelope = AABB<[T; 2]>;
 
     fn envelope(&self) -> Self::Envelope {
-        let rect = match self {
-            GridGeom::Line(line) => line.bounding_rect(),
-            GridGeom::Polygon(poly) => poly.bounding_rect().unwrap(),
-        };
-        AABB::from_corners([rect.min.x, rect.min.y], [rect.max.x, rect.max.y])
+        match self {
+            GridGeom::Point(pt) => AABB::from_point([pt.x(), pt.y()]),
+            GridGeom::Line(line) => {
+                let bb = line.bounding_rect();
+                AABB::from_corners([bb.min.x, bb.min.y], [bb.max.x, bb.max.y])
+            }
+            GridGeom::Polygon(poly) => {
+                let bb = poly.bounding_rect().unwrap();
+                AABB::from_corners([bb.min.x, bb.min.y], [bb.max.x, bb.max.y])
+            },
+        }
     }
 }
 
@@ -129,6 +137,7 @@ where
                 let intersecting_geoms: Vec<&GridGeom<T>> = envelope_intersect
                     .into_iter()
                     .skip_while(|l| match l {
+                        GridGeom::Point(pt) => !rect_poly.contains(pt),
                         GridGeom::Line(line) => !rect_poly.intersects(line),
                         GridGeom::Polygon(poly) => !rect_poly.intersects(poly),
                     })

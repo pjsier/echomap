@@ -6,7 +6,8 @@ extern crate clap;
 
 use clap::{App, Arg};
 use console::Term;
-use geo_types::{LineString, MultiLineString, MultiPolygon, Polygon, Rect};
+use csv;
+use geo_types::{LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon, Rect};
 use geojson::{GeoJson, Geometry, Value};
 use indicatif::ProgressBar;
 use num_traits::{Float, FromPrimitive};
@@ -16,15 +17,22 @@ pub mod map_grid;
 use map_grid::{GridGeom, MapGrid};
 
 /// Process GeoJSON geometries
-fn match_geometry<T: Float + RTreeNum + FromPrimitive>(geom: Geometry) -> Vec<GridGeom<T>> {
+fn match_geometry<T: Float + RTreeNum + FromPrimitive>(
+    geom: Geometry,
+    is_area: bool,
+) -> Vec<GridGeom<T>> {
     match geom.value {
+        Value::Point(_) => {
+            let pt: Point<T> = geom.value.try_into().unwrap();
+            vec![GridGeom::Point(pt)]
+        }
+        Value::MultiPoint(_) => {
+            let mpt: MultiPoint<T> = geom.value.try_into().unwrap();
+            mpt.into_iter().map(|p| GridGeom::Point(p)).collect()
+        }
         Value::LineString(_) => {
             let ls: LineString<T> = geom.value.try_into().unwrap();
             ls.lines().map(|l| GridGeom::Line(l)).collect()
-        }
-        Value::Polygon(_) => {
-            let poly: Polygon<T> = geom.value.try_into().unwrap();
-            poly.exterior().lines().map(|l| GridGeom::Line(l)).collect()
         }
         Value::MultiLineString(_) => {
             let ml: MultiLineString<T> = geom.value.try_into().unwrap();
@@ -33,38 +41,51 @@ fn match_geometry<T: Float + RTreeNum + FromPrimitive>(geom: Geometry) -> Vec<Gr
                 .map(|l| GridGeom::Line(l))
                 .collect()
         }
+        Value::Polygon(_) => {
+            let poly: Polygon<T> = geom.value.try_into().unwrap();
+            match is_area {
+                true => vec![GridGeom::Polygon(poly)],
+                false => poly.exterior().lines().map(|l| GridGeom::Line(l)).collect(),
+            }
+        }
         Value::MultiPolygon(_) => {
             let mp: MultiPolygon<T> = geom.value.try_into().unwrap();
-            mp.into_iter()
-                .flat_map(|geometry| geometry.exterior().lines().collect::<Vec<_>>())
-                .map(|l| GridGeom::Line(l))
-                .collect()
+            match is_area {
+                true => mp.into_iter().map(|p| GridGeom::Polygon(p)).collect(),
+                false => mp
+                    .into_iter()
+                    .flat_map(|geometry| geometry.exterior().lines().collect::<Vec<_>>())
+                    .map(|l| GridGeom::Line(l))
+                    .collect(),
+            }
         }
         Value::GeometryCollection(collection) => collection
             .into_iter()
-            .flat_map(|geometry| match_geometry(geometry))
+            .flat_map(|geometry| match_geometry(geometry, is_area))
             .collect(),
-        _ => vec![],
     }
 }
 
 /// Process top-level GeoJSON items
-fn process_geojson<T: Float + RTreeNum + FromPrimitive>(gj: GeoJson) -> Vec<GridGeom<T>> {
+fn process_geojson<T: Float + RTreeNum + FromPrimitive>(
+    gj: GeoJson,
+    is_area: bool,
+) -> Vec<GridGeom<T>> {
     match gj {
         GeoJson::FeatureCollection(collection) => collection
             .features
             .into_iter()
             .filter_map(|feature| feature.geometry)
-            .flat_map(|geometry| match_geometry(geometry))
+            .flat_map(|geometry| match_geometry(geometry, is_area))
             .collect(),
         GeoJson::Feature(feature) => {
             if let Some(geometry) = feature.geometry {
-                match_geometry(geometry)
+                match_geometry(geometry, is_area)
             } else {
                 vec![]
             }
         }
-        GeoJson::Geometry(geometry) => match_geometry(geometry),
+        GeoJson::Geometry(geometry) => match_geometry(geometry, is_area),
     }
 }
 
@@ -107,14 +128,20 @@ fn main() {
             .value_name("COLUMNS")
             .help("Sets the number of columns (in characters) of the printed output. Defaults to terminal height minus 1.")
             .takes_value(true))
+        .arg(Arg::with_name("area")
+            .short("a")
+            .long("area")
+            .help("Print polygon area instead of boundaries"))
         .get_matches();
 
     let spinner = ProgressBar::new_spinner();
     spinner.set_message("Reading file");
     spinner.enable_steady_tick(1);
 
-    let mut input_str = String::new();
+    spinner.set_message("Parsing geography");
+
     let file_path = matches.value_of("INPUT").unwrap();
+    let mut input_str = String::new();
     match file_path.as_ref() {
         "-" => {
             io::stdin()
@@ -130,13 +157,48 @@ fn main() {
     };
 
     spinner.set_message("Parsing geography");
-    let gj_result: Result<GeoJson, _> = match matches.value_of("format").unwrap() {
-        "geojson" => input_str.parse::<GeoJson>(),
-        "csv" => input_str.parse::<GeoJson>(),
+    let geoms: Vec<GridGeom<f64>> = match matches.value_of("format").unwrap() {
+        "geojson" => {
+            let gj: GeoJson = input_str
+                .parse::<GeoJson>()
+                .expect("Unable to parse GeoJSON");
+            process_geojson(gj, matches.is_present("area"))
+        }
+        "csv" => {
+            let mut rdr = csv::Reader::from_reader(input_str.as_bytes());
+            let headers = rdr.headers().expect("Unable to load CSV headers");
+            let lat_col = matches.value_of("lat").unwrap();
+            let lon_col = matches.value_of("lon").unwrap();
+
+            let lat_idx = headers
+                .iter()
+                .position(|v| v == lat_col)
+                .expect("Lat column not found");
+            let lon_idx = headers
+                .iter()
+                .position(|v| v == lon_col)
+                .expect("Lon column not found");
+
+            rdr.records()
+                .map(|rec_val| {
+                    let rec = rec_val.unwrap();
+                    let lat_val: f64 = rec
+                        .get(lat_idx)
+                        .unwrap()
+                        .parse()
+                        .expect("Could not parse lat value from record");
+                    let lon_val: f64 = rec
+                        .get(lon_idx)
+                        .unwrap()
+                        .parse()
+                        .expect("Could not parse lon value from record");
+                    let pt: Point<f64> = Point::new(lon_val, lat_val);
+                    GridGeom::Point(pt)
+                })
+                .collect()
+        }
         _ => panic!("Invalid format supplied"),
     };
-    let gj: GeoJson = gj_result.expect("Unable to parse geograpy");
-    let geoms: Vec<GridGeom<f64>> = process_geojson(gj);
 
     // Create a combined LineString for bounds calculation
     spinner.set_message("Indexing geography");
