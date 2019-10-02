@@ -1,8 +1,8 @@
 use std::char;
 use std::io::{self, Write};
 
-use geo::algorithm::contains::Contains;
 use geo::algorithm::bounding_rect::BoundingRect;
+use geo::algorithm::contains::Contains;
 use geo::algorithm::intersects::Intersects;
 use geo_types::{CoordinateType, Line, Point, Polygon, Rect};
 use num_traits::{Float, FromPrimitive};
@@ -33,9 +33,30 @@ where
             GridGeom::Polygon(poly) => {
                 let bb = poly.bounding_rect().unwrap();
                 AABB::from_corners([bb.min.x, bb.min.y], [bb.max.x, bb.max.y])
-            },
+            }
         }
     }
+}
+
+/// Convert row/col coordinates to associated Braille hex value
+pub fn braille_cell_value(row: i32, col: i32) -> u32 {
+    match (row, col) {
+        (0, 0) => 0x01,
+        (0, 1) => 0x08,
+        (1, 0) => 0x02,
+        (1, 1) => 0x10,
+        (2, 0) => 0x04,
+        (2, 1) => 0x20,
+        (3, 0) => 0x40,
+        (3, 1) => 0x80,
+        (_, _) => 0x00,
+    }
+}
+
+/// Add the Braille offset base to the calculated cell value to generate a char
+pub fn braille_char(suffix: u32) -> char {
+    let braille_offset = 0x2800;
+    char::from_u32(braille_offset + suffix).unwrap()
 }
 
 pub struct MapGrid<T>
@@ -53,7 +74,9 @@ impl<T> MapGrid<T>
 where
     T: Float + RTreeNum + FromPrimitive,
 {
-    pub fn new(width: f64, height: f64, bbox: Rect<T>, rtree: RTree<GridGeom<T>>) -> MapGrid<T> {
+    pub fn new(width: f64, height: f64, rtree: RTree<GridGeom<T>>) -> MapGrid<T> {
+        let envelope = rtree.root().envelope();
+        let bbox = Rect::new(envelope.lower(), envelope.upper());
         let box_width = bbox.width().to_f64().unwrap();
         let box_height = bbox.height().to_f64().unwrap();
 
@@ -96,7 +119,7 @@ where
             let mut row_str = "".to_string();
             for c in 0..self.cols {
                 let cell_value = self.query_cell_value(r, c);
-                row_str.push_str(&Self::braille_char(cell_value).to_string());
+                row_str.push_str(&braille_char(cell_value).to_string());
             }
             writeln!(handle, "{}", row_str).expect("Error printing line");
         }
@@ -145,32 +168,34 @@ where
 
                 // Add the associated cell value if intersecting lines are found
                 if intersecting_geoms.len() > 0 {
-                    cell_value = cell_value + Self::braille_cell_value(r, c);
+                    cell_value = cell_value + braille_cell_value(r, c);
                 }
             }
         }
 
         cell_value
     }
+}
 
-    /// Convert row/col coordinates to associated Braille hex value
-    pub fn braille_cell_value(row: i32, col: i32) -> u32 {
-        match (row, col) {
-            (0, 0) => 0x01,
-            (0, 1) => 0x08,
-            (1, 0) => 0x02,
-            (1, 1) => 0x10,
-            (2, 0) => 0x04,
-            (2, 1) => 0x20,
-            (3, 0) => 0x40,
-            (3, 1) => 0x80,
-            (_, _) => 0x00,
-        }
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn new_clamps_aspect_ratio() {
+        let line = GridGeom::Line(Line::new([0., 0.], [5., 1.]));
+        let rtree = RTree::bulk_load(vec![line]);
+        let grid = MapGrid::new(1., 5., rtree);
+        assert_eq!((grid.cols, grid.rows), (1, 5));
     }
 
-    /// Add the Braille offset base to the calculated cell value to generate a char
-    pub fn braille_char(suffix: u32) -> char {
-        let braille_offset = 0x2800;
-        char::from_u32(braille_offset + suffix).unwrap()
+    #[test]
+    fn query_cell_value_returns_value() {
+        let rtree = RTree::bulk_load(vec![
+            GridGeom::Line(Line::new([0., 0.], [4., 0.])),
+            GridGeom::Point(Point::new(0., 1.)),
+        ]);
+        let grid = MapGrid::new(4., 4., rtree);
+        assert_eq!(grid.query_cell_value(0, 0), 0x36);
     }
 }

@@ -4,9 +4,11 @@ version = "0.1.0"
 authors = ["Pat Sier <pjsier@gmail.com>"]
 description = "A command line tool for previewing map files in the console"
 readme = "README.md"
+homepage = "https://github.com/pjsier/echomap"
 repository = "https://github.com/pjsier/echomap"
 license = "MIT"
 edition = "2018"
+keywords = ["geo", "map", "gis"]
 
 [dependencies]
 geo = "0.12"

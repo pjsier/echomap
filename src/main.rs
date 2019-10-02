@@ -7,7 +7,7 @@ extern crate clap;
 use clap::{App, Arg};
 use console::Term;
 use csv;
-use geo_types::{LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon, Rect};
+use geo_types::{LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon};
 use geojson::{GeoJson, Geometry, Value};
 use indicatif::ProgressBar;
 use num_traits::{Float, FromPrimitive};
@@ -17,7 +17,7 @@ pub mod map_grid;
 use map_grid::{GridGeom, MapGrid};
 
 /// Process GeoJSON geometries
-fn match_geometry<T: Float + RTreeNum + FromPrimitive>(
+fn match_geojson_geometry<T: Float + RTreeNum + FromPrimitive>(
     geom: Geometry,
     is_area: bool,
 ) -> Vec<GridGeom<T>> {
@@ -61,7 +61,7 @@ fn match_geometry<T: Float + RTreeNum + FromPrimitive>(
         }
         Value::GeometryCollection(collection) => collection
             .into_iter()
-            .flat_map(|geometry| match_geometry(geometry, is_area))
+            .flat_map(|geometry| match_geojson_geometry(geometry, is_area))
             .collect(),
     }
 }
@@ -76,16 +76,16 @@ fn process_geojson<T: Float + RTreeNum + FromPrimitive>(
             .features
             .into_iter()
             .filter_map(|feature| feature.geometry)
-            .flat_map(|geometry| match_geometry(geometry, is_area))
+            .flat_map(|geometry| match_geojson_geometry(geometry, is_area))
             .collect(),
         GeoJson::Feature(feature) => {
             if let Some(geometry) = feature.geometry {
-                match_geometry(geometry, is_area)
+                match_geojson_geometry(geometry, is_area)
             } else {
                 vec![]
             }
         }
-        GeoJson::Geometry(geometry) => match_geometry(geometry, is_area),
+        GeoJson::Geometry(geometry) => match_geojson_geometry(geometry, is_area),
     }
 }
 
@@ -203,8 +203,6 @@ fn main() {
     // Create a combined LineString for bounds calculation
     spinner.set_message("Indexing geography");
     let rtree: RTree<GridGeom<f64>> = RTree::bulk_load(geoms);
-    let envelope = rtree.root().envelope();
-    let rect = Rect::new(envelope.lower(), envelope.upper());
 
     let (term_height, term_width) = Term::stdout().size();
     let height: f64 = match matches.value_of("rows") {
@@ -215,7 +213,7 @@ fn main() {
         Some(ref cols) => cols.parse().expect("Columns cannot be parsed as a number."),
         None => term_width as f64,
     };
-    let grid = MapGrid::new(width, height, rect, rtree);
+    let grid = MapGrid::new(width, height, rtree);
     spinner.finish_and_clear();
     grid.print();
 }
