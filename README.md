@@ -1,5 +1,7 @@
 # `echomap`
 
+![](https://github.com/pjsier/echomap/workflows/CI%20Checks/badge.svg)
+
 Preview map files in the console
 
 [![asciicast](https://asciinema.org/a/a3y3vFk4TOY9cvMEcrzKwOPW9.svg)](https://asciinema.org/a/a3y3vFk4TOY9cvMEcrzKwOPW9)
