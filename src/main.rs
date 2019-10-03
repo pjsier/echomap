@@ -1,4 +1,4 @@
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fs;
 use std::io::{self, Read};
 
@@ -7,85 +7,89 @@ extern crate clap;
 use clap::{App, Arg};
 use console::Term;
 use csv;
-use geo_types::{LineString, MultiLineString, MultiPoint, MultiPolygon, Point, Polygon};
-use geojson::{GeoJson, Geometry, Value};
+use geo_types::{Geometry, Point};
+use geojson::{self, GeoJson};
 use indicatif::ProgressBar;
-use num_traits::{Float, FromPrimitive};
-use rstar::{RTree, RTreeNum};
+use rstar::RTree;
+use shapefile;
 
 pub mod map_grid;
 use map_grid::{GridGeom, MapGrid};
 
-/// Process GeoJSON geometries
-fn match_geojson_geometry<T: Float + RTreeNum + FromPrimitive>(
-    geom: Geometry,
-    is_area: bool,
-) -> Vec<GridGeom<T>> {
-    match geom.value {
-        Value::Point(_) => {
-            let pt: Point<T> = geom.value.try_into().unwrap();
-            vec![GridGeom::Point(pt)]
+/// Read file path (or stdin) to string
+fn read_input_to_string(file_path: &str) -> String {
+    let mut input_str = String::new();
+    match file_path.as_ref() {
+        "-" => {
+            io::stdin()
+                .read_to_string(&mut input_str)
+                .expect("There was an error reading from stdin");
         }
-        Value::MultiPoint(_) => {
-            let mpt: MultiPoint<T> = geom.value.try_into().unwrap();
-            mpt.into_iter().map(|p| GridGeom::Point(p)).collect()
+        _ => {
+            fs::File::open(file_path)
+                .unwrap()
+                .read_to_string(&mut input_str)
+                .expect("There was an error reading your file");
         }
-        Value::LineString(_) => {
-            let ls: LineString<T> = geom.value.try_into().unwrap();
-            ls.lines().map(|l| GridGeom::Line(l)).collect()
-        }
-        Value::MultiLineString(_) => {
-            let ml: MultiLineString<T> = geom.value.try_into().unwrap();
-            ml.into_iter()
-                .flat_map(|ls| ls.lines().collect::<Vec<_>>())
-                .map(|l| GridGeom::Line(l))
-                .collect()
-        }
-        Value::Polygon(_) => {
-            let poly: Polygon<T> = geom.value.try_into().unwrap();
-            match is_area {
-                true => vec![GridGeom::Polygon(poly)],
-                false => poly.exterior().lines().map(|l| GridGeom::Line(l)).collect(),
-            }
-        }
-        Value::MultiPolygon(_) => {
-            let mp: MultiPolygon<T> = geom.value.try_into().unwrap();
-            match is_area {
-                true => mp.into_iter().map(|p| GridGeom::Polygon(p)).collect(),
-                false => mp
-                    .into_iter()
-                    .flat_map(|geometry| geometry.exterior().lines().collect::<Vec<_>>())
-                    .map(|l| GridGeom::Line(l))
-                    .collect(),
-            }
-        }
-        Value::GeometryCollection(collection) => collection
+    };
+    input_str
+}
+
+/// Simplify geometries into component pieces for GridGeom
+fn convert_geometry(geom: Geometry<f64>, is_area: bool) -> Vec<GridGeom<f64>> {
+    match geom {
+        Geometry::Point(s) => vec![GridGeom::Point(s)],
+        Geometry::MultiPoint(s) => s.into_iter().map(|p| GridGeom::Point(p)).collect(),
+        Geometry::Line(s) => vec![GridGeom::Line(s)],
+        Geometry::LineString(s) => s.lines().map(|l| GridGeom::Line(l)).collect(),
+        Geometry::MultiLineString(s) => s
             .into_iter()
-            .flat_map(|geometry| match_geojson_geometry(geometry, is_area))
+            .flat_map(|ls| ls.lines().collect::<Vec<_>>())
+            .map(|l| GridGeom::Line(l))
+            .collect(),
+        Geometry::Polygon(s) => match is_area {
+            true => vec![GridGeom::Polygon(s)],
+            false => s.exterior().lines().map(|l| GridGeom::Line(l)).collect(),
+        },
+        Geometry::MultiPolygon(s) => match is_area {
+            true => s.into_iter().map(|p| GridGeom::Polygon(p)).collect(),
+            false => s
+                .into_iter()
+                .flat_map(|p| p.exterior().lines().collect::<Vec<_>>())
+                .map(|l| GridGeom::Line(l))
+                .collect(),
+        },
+        Geometry::GeometryCollection(s) => s
+            .into_iter()
+            .flat_map(|g| convert_geometry(g, is_area))
             .collect(),
     }
 }
 
 /// Process top-level GeoJSON items
-fn process_geojson<T: Float + RTreeNum + FromPrimitive>(
-    gj: GeoJson,
-    is_area: bool,
-) -> Vec<GridGeom<T>> {
+fn process_geojson(gj: GeoJson, is_area: bool) -> Vec<GridGeom<f64>> {
     match gj {
         GeoJson::FeatureCollection(collection) => collection
             .features
             .into_iter()
             .filter_map(|feature| feature.geometry)
-            .flat_map(|geometry| match_geojson_geometry(geometry, is_area))
+            .flat_map(|g| {
+                let geom: Geometry<f64> = g.value.try_into().unwrap();
+                convert_geometry(geom, is_area)
+            })
             .collect(),
         GeoJson::Feature(feature) => {
             if let Some(geometry) = feature.geometry {
-                match_geojson_geometry(geometry, is_area)
+                let geom: Geometry<f64> = geometry.value.try_into().unwrap();
+                convert_geometry(geom, is_area)
             } else {
                 vec![]
             }
         }
-        GeoJson::Geometry(geometry) => match_geojson_geometry(geometry, is_area),
+        GeoJson::Geometry(geometry) => {
+            let geom: Geometry<f64> = geometry.value.try_into().unwrap();
+            convert_geometry(geom, is_area)
+        }
     }
 }
 
@@ -103,18 +107,20 @@ fn main() {
             .long("format")
             .value_name("FORMAT")
             .help("Input file format")
-            .possible_values(&["geojson", "csv"])
+            .possible_values(&["geojson", "csv", "shp"])
             .default_value("geojson")
             .takes_value(true))
         .arg(Arg::with_name("lon")
             .long("lon")
             .value_name("LON")
             .takes_value(true)
+            .help("Name of longitude column (if format is 'csv')")
             .default_value_if("format", Some("csv"), "lon"))
         .arg(Arg::with_name("lat")
             .long("lat")
             .value_name("LAT")
             .takes_value(true)
+            .help("Name of latitude column (if format is 'csv')")
             .default_value_if("format", Some("csv"), "lat"))
         .arg(Arg::with_name("rows")
             .short("r")
@@ -139,32 +145,16 @@ fn main() {
     spinner.enable_steady_tick(1);
 
     spinner.set_message("Parsing geography");
-
-    let file_path = matches.value_of("INPUT").unwrap();
-    let mut input_str = String::new();
-    match file_path.as_ref() {
-        "-" => {
-            io::stdin()
-                .read_to_string(&mut input_str)
-                .expect("There was an error reading from stdin");
-        }
-        _ => {
-            fs::File::open(file_path)
-                .unwrap()
-                .read_to_string(&mut input_str)
-                .expect("There was an error reading your file");
-        }
-    };
-
-    spinner.set_message("Parsing geography");
     let geoms: Vec<GridGeom<f64>> = match matches.value_of("format").unwrap() {
         "geojson" => {
+            let input_str = read_input_to_string(matches.value_of("INPUT").unwrap());
             let gj: GeoJson = input_str
                 .parse::<GeoJson>()
                 .expect("Unable to parse GeoJSON");
             process_geojson(gj, matches.is_present("area"))
         }
         "csv" => {
+            let input_str = read_input_to_string(matches.value_of("INPUT").unwrap());
             let mut rdr = csv::Reader::from_reader(input_str.as_bytes());
             let headers = rdr.headers().expect("Unable to load CSV headers");
             let lat_col = matches.value_of("lat").unwrap();
@@ -194,6 +184,20 @@ fn main() {
                         .expect("Could not parse lon value from record");
                     let pt: Point<f64> = Point::new(lon_val, lat_val);
                     GridGeom::Point(pt)
+                })
+                .collect()
+        }
+        "shp" => {
+            let rdr = shapefile::Reader::from_path(matches.value_of("INPUT").unwrap())
+                .expect("There was an error opening the shapefile");
+            rdr.iter_shapes()
+                .filter_map(|s| s.ok())
+                .flat_map(|s| {
+                    let geom = Geometry::<f64>::try_from(s);
+                    match geom.is_ok() {
+                        true => convert_geometry(geom.unwrap(), matches.is_present("area")),
+                        false => vec![],
+                    }
                 })
                 .collect()
         }
