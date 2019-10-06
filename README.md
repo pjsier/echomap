@@ -1,10 +1,17 @@
 # `echomap`
 
-![](https://github.com/pjsier/echomap/workflows/CI%20Checks/badge.svg)
+[![crates.io](https://img.shields.io/crates/v/echomap.svg)](https://crates.io/crates/echomap)
+![Build status](https://github.com/pjsier/echomap/workflows/CI%20Checks/badge.svg)
 
-Preview map files in the console
+Preview map files in the terminal
 
-[![asciicast](https://asciinema.org/a/a3y3vFk4TOY9cvMEcrzKwOPW9.svg)](https://asciinema.org/a/a3y3vFk4TOY9cvMEcrzKwOPW9)
+![Terminal recording gif](https://raw.githubusercontent.com/pjsier/echomap/master/img/recording.gif?raw=true)
+
+## Installation
+
+If you have `cargo` installed, you can run `cargo install echomap` and then run it from `$HOME/.cargo/bin`. More details on this are available in [`cargo-install` documentation](https://doc.rust-lang.org/cargo/commands/cargo-install.html).
+
+There are also [binaries available](https://github.com/pjsier/echomap/releases) for MacOS, Windows and Linux.
 
 ## Usage
 

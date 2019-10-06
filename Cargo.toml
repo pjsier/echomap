@@ -1,15 +1,15 @@
 [package]
 name = "echomap"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Pat Sier <pjsier@gmail.com>"]
-description = "A command line tool for previewing map files in the console"
+description = "A command line tool for previewing map files in the terminal"
 readme = "README.md"
 homepage = "https://github.com/pjsier/echomap"
 repository = "https://github.com/pjsier/echomap"
 license = "MIT"
 edition = "2018"
-keywords = ["geo", "map", "gis"]
-exclude = [".github/*"]
+keywords = ["geo", "map", "gis", "cli"]
+exclude = [".github/*", "img/*"]
 
 [dependencies]
 geo = "0.12"

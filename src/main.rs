@@ -95,8 +95,8 @@ fn process_geojson(gj: GeoJson, is_area: bool) -> Vec<GridGeom<f64>> {
 
 fn main() {
     let matches = App::new("echomap")
-        .version("0.2.0")
-        .about("Preview map files in the console")
+        .version("0.2.1")
+        .about("Preview map files in the terminal")
         .author("Pat Sier <pjsier@gmail.com>")
         .arg(Arg::with_name("INPUT")
             .help("File to parse or '-' to read stdin")
