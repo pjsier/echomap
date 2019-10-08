@@ -19,7 +19,7 @@ use map_grid::{GridGeom, MapGrid};
 /// Read file path (or stdin) to string
 fn read_input_to_string(file_path: &str) -> String {
     let mut input_str = String::new();
-    match file_path.as_ref() {
+    match file_path {
         "-" => {
             io::stdin()
                 .read_to_string(&mut input_str)
@@ -39,26 +39,31 @@ fn read_input_to_string(file_path: &str) -> String {
 fn convert_geometry(geom: Geometry<f64>, is_area: bool) -> Vec<GridGeom<f64>> {
     match geom {
         Geometry::Point(s) => vec![GridGeom::Point(s)],
-        Geometry::MultiPoint(s) => s.into_iter().map(|p| GridGeom::Point(p)).collect(),
+        Geometry::MultiPoint(s) => s.into_iter().map(GridGeom::Point).collect(),
         Geometry::Line(s) => vec![GridGeom::Line(s)],
-        Geometry::LineString(s) => s.lines().map(|l| GridGeom::Line(l)).collect(),
+        Geometry::LineString(s) => s.lines().map(GridGeom::Line).collect(),
         Geometry::MultiLineString(s) => s
             .into_iter()
             .flat_map(|ls| ls.lines().collect::<Vec<_>>())
-            .map(|l| GridGeom::Line(l))
+            .map(GridGeom::Line)
             .collect(),
-        Geometry::Polygon(s) => match is_area {
-            true => vec![GridGeom::Polygon(s)],
-            false => s.exterior().lines().map(|l| GridGeom::Line(l)).collect(),
-        },
-        Geometry::MultiPolygon(s) => match is_area {
-            true => s.into_iter().map(|p| GridGeom::Polygon(p)).collect(),
-            false => s
-                .into_iter()
-                .flat_map(|p| p.exterior().lines().collect::<Vec<_>>())
-                .map(|l| GridGeom::Line(l))
-                .collect(),
-        },
+        Geometry::Polygon(s) => {
+            if is_area {
+                vec![GridGeom::Polygon(s)]
+            } else {
+                s.exterior().lines().map(GridGeom::Line).collect()
+            }
+        }
+        Geometry::MultiPolygon(s) => {
+            if is_area {
+                s.into_iter().map(GridGeom::Polygon).collect()
+            } else {
+                s.into_iter()
+                    .flat_map(|p| p.exterior().lines().collect::<Vec<_>>())
+                    .map(GridGeom::Line)
+                    .collect()
+            }
+        }
         Geometry::GeometryCollection(s) => s
             .into_iter()
             .flat_map(|g| convert_geometry(g, is_area))
@@ -95,7 +100,7 @@ fn process_geojson(gj: GeoJson, is_area: bool) -> Vec<GridGeom<f64>> {
 
 fn main() {
     let matches = App::new("echomap")
-        .version("0.2.1")
+        .version("0.2.2")
         .about("Preview map files in the terminal")
         .author("Pat Sier <pjsier@gmail.com>")
         .arg(Arg::with_name("INPUT")
@@ -194,9 +199,10 @@ fn main() {
                 .filter_map(|s| s.ok())
                 .flat_map(|s| {
                     let geom = Geometry::<f64>::try_from(s);
-                    match geom.is_ok() {
-                        true => convert_geometry(geom.unwrap(), matches.is_present("area")),
-                        false => vec![],
+                    if geom.is_ok() {
+                        convert_geometry(geom.unwrap(), matches.is_present("area"))
+                    } else {
+                        vec![]
                     }
                 })
                 .collect()
@@ -211,11 +217,11 @@ fn main() {
     let (term_height, term_width) = Term::stdout().size();
     let height: f64 = match matches.value_of("rows") {
         Some(ref rows) => rows.parse().expect("Rows cannot be parsed as a number."),
-        None => (term_height - 1) as f64,
+        None => f64::from(term_height - 1),
     };
     let width: f64 = match matches.value_of("columns") {
         Some(ref cols) => cols.parse().expect("Columns cannot be parsed as a number."),
-        None => term_width as f64,
+        None => f64::from(term_width),
     };
     let grid = MapGrid::new(width, height, rtree);
     spinner.finish_and_clear();
