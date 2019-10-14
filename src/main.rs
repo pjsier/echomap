@@ -197,13 +197,9 @@ fn main() {
                 .expect("There was an error opening the shapefile");
             rdr.iter_shapes()
                 .filter_map(|s| s.ok())
-                .flat_map(|s| {
-                    let geom = Geometry::<f64>::try_from(s);
-                    if geom.is_ok() {
-                        convert_geometry(geom.unwrap(), matches.is_present("area"))
-                    } else {
-                        vec![]
-                    }
+                .flat_map(|s| match Geometry::<f64>::try_from(s) {
+                    Ok(geom) => convert_geometry(geom, matches.is_present("area")),
+                    Err(_) => vec![],
                 })
                 .collect()
         }
