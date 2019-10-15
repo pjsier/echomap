@@ -12,6 +12,7 @@ use geojson::{self, GeoJson};
 use indicatif::ProgressBar;
 use rstar::RTree;
 use shapefile;
+use topojson::{to_geojson, TopoJson};
 
 pub mod map_grid;
 use map_grid::{GridGeom, MapGrid};
@@ -112,7 +113,7 @@ fn main() {
             .long("format")
             .value_name("FORMAT")
             .help("Input file format")
-            .possible_values(&["geojson", "csv", "shp"])
+            .possible_values(&["geojson", "topojson", "csv", "shp"])
             .default_value("geojson")
             .takes_value(true))
         .arg(Arg::with_name("lon")
@@ -157,6 +158,23 @@ fn main() {
                 .parse::<GeoJson>()
                 .expect("Unable to parse GeoJSON");
             process_geojson(gj, matches.is_present("area"))
+        }
+        "topojson" => {
+            let input_str = read_input_to_string(matches.value_of("INPUT").unwrap());
+            let topo = input_str
+                .parse::<TopoJson>()
+                .expect("Unable to parse TopoJSON");
+            match topo {
+                TopoJson::Topology(t) => t
+                    .list_names()
+                    .into_iter()
+                    .map(|n| to_geojson(&t, &n))
+                    .filter_map(|g| g.ok())
+                    .map(GeoJson::FeatureCollection)
+                    .flat_map(|g| process_geojson(g, matches.is_present("area")))
+                    .collect(),
+                _ => unimplemented!(),
+            }
         }
         "csv" => {
             let input_str = read_input_to_string(matches.value_of("INPUT").unwrap());

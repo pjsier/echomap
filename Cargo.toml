@@ -22,6 +22,7 @@ indicatif = "0.11.0"
 clap = "2.33.0"
 csv = "1.1"
 shapefile = { version = "0.0.5", features = ["geo-types"] }
+topojson = "0.2.0"
 
 [[bin]]
 name = "echomap"
