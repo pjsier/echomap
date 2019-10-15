@@ -1,4 +1,4 @@
-name: Create and deploy release
+name: Release
 
 on:
   push:
@@ -10,6 +10,8 @@ jobs:
   publish-crate:
 
     name: Publish crate
+
+    runs-on: ubuntu-latest
 
     steps:
 
@@ -29,6 +31,8 @@ jobs:
     strategy:
 
       matrix:
+
+        os: [ubuntu-latest, windows-latest, macos-latest]
 
         include:
 
