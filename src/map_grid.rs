@@ -8,6 +8,9 @@ use geo_types::{CoordinateType, Line, Point, Polygon, Rect};
 use num_traits::{Float, FromPrimitive};
 use rstar::{self, RTree, RTreeNum, RTreeObject, AABB};
 
+const CELL_ROWS: i32 = 4;
+const CELL_COLS: i32 = 2;
+
 pub enum GridGeom<T>
 where
     T: CoordinateType + Float + RTreeNum + FromPrimitive,
@@ -66,7 +69,8 @@ where
     rows: i32,
     cols: i32,
     bbox: Rect<T>,
-    cellsize: [f64; 2],
+    cell_size: [f64; 2],
+    inner_cell_size: [f64; 2],
     rtree: RTree<GridGeom<T>>,
 }
 
@@ -105,7 +109,11 @@ where
             bbox,
             rows,
             cols,
-            cellsize: [cell_width, cell_height],
+            cell_size: [cell_width, cell_height],
+            inner_cell_size: [
+                cell_width / f64::from(CELL_COLS),
+                cell_height / f64::from(CELL_ROWS),
+            ],
             rtree,
         }
     }
@@ -126,43 +134,40 @@ where
     }
 
     /// For a given Braille 2x4 cell, query which cells have lines in them
-    pub fn query_cell_value(&self, row: i32, col: i32) -> u32 {
-        let cell_rows = 4;
-        let cell_cols = 2;
+    fn query_cell_value(&self, row: i32, col: i32) -> u32 {
         let mut cell_value = 0x00;
-
-        let cell_width = self.cellsize[0] / f64::from(cell_cols);
-        let cell_height = self.cellsize[1] / f64::from(cell_rows);
 
         // Get the start offset dimensions based on the outer row and column
         let cell_start_width =
-            (self.cellsize[0] * f64::from(col)) + self.bbox.min.x.to_f64().unwrap();
+            (self.cell_size[0] * f64::from(col)) + self.bbox.min.x.to_f64().unwrap();
         let cell_start_height =
-            self.bbox.max.y.to_f64().unwrap() - (self.cellsize[1] * f64::from(row));
+            self.bbox.max.y.to_f64().unwrap() - (self.cell_size[1] * f64::from(row));
 
-        for r in 0..cell_rows {
-            for c in 0..cell_cols {
+        for r in 0..CELL_ROWS {
+            for c in 0..CELL_COLS {
                 // Generate an envelope from the coordinates of the current cell
-                let cell_min_x = cell_start_width + (cell_width * f64::from(c));
-                let cell_max_y = cell_start_height - (cell_height * f64::from(r));
-                let cell_max_x = T::from_f64(cell_min_x + cell_width).unwrap();
-                let cell_min_y = T::from_f64(cell_max_y - cell_height).unwrap();
+                let cell_min_x = cell_start_width + (self.inner_cell_size[0] * f64::from(c));
+                let cell_max_y = cell_start_height - (self.inner_cell_size[1] * f64::from(r));
+                let cell_max_x = T::from_f64(cell_min_x + self.inner_cell_size[0]).unwrap();
+                let cell_min_y = T::from_f64(cell_max_y - self.inner_cell_size[1]).unwrap();
 
                 let min_pt = Point::new(T::from_f64(cell_min_x).unwrap(), cell_min_y);
                 let max_pt = Point::new(cell_max_x, T::from_f64(cell_max_y).unwrap());
 
                 let envelope =
                     AABB::from_corners([min_pt.x(), min_pt.y()], [max_pt.x(), max_pt.y()]);
-                let rect_poly = Polygon::from(Rect::new(min_pt, max_pt));
 
                 // Find all intersecting envelopes, check if the underlying lines intersect
-                let envelope_intersect = self.rtree.locate_in_envelope_intersecting(&envelope);
-                let intersecting_geoms: Vec<&GridGeom<T>> = envelope_intersect
+                let poly_bounds = Polygon::from(Rect::new(min_pt, max_pt));
+                let intersecting_geoms: Vec<&GridGeom<T>> = self
+                    .rtree
+                    .locate_in_envelope_intersecting(&envelope)
                     .skip_while(|l| match l {
-                        GridGeom::Point(pt) => !rect_poly.contains(pt),
-                        GridGeom::Line(line) => !rect_poly.intersects(line),
-                        GridGeom::Polygon(poly) => !rect_poly.intersects(poly),
+                        GridGeom::Point(pt) => !poly_bounds.contains(pt),
+                        GridGeom::Line(line) => !poly_bounds.intersects(line),
+                        GridGeom::Polygon(poly) => !poly_bounds.intersects(poly),
                     })
+                    .take(1)
                     .collect();
 
                 // Add the associated cell value if intersecting lines are found
