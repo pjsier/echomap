@@ -27,7 +27,8 @@ FLAGS:
 OPTIONS:
     -c, --columns <COLUMNS>    Sets the number of columns (in characters) of the printed output. Defaults to terminal
                                height minus 1.
-    -f, --format <FORMAT>      Input file format [default: geojson]  [possible values: geojson, csv, shp]
+    -f, --format <FORMAT>      Input file format (tries to infer from file extension by default) [possible values:
+                               geojson, topojson, csv, shp]
         --lat <LAT>            Name of latitude column (if format is 'csv')
         --lon <LON>            Name of longitude column (if format is 'csv')
     -r, --rows <ROWS>          Sets the number of rows (in characters) of the printed output. Defaults to terminal

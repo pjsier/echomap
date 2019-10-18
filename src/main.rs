@@ -112,9 +112,9 @@ fn main() {
             .short("f")
             .long("format")
             .value_name("FORMAT")
-            .help("Input file format")
+            .help("Input file format (tries to infer from file extension by default)")
             .possible_values(&["geojson", "topojson", "csv", "shp"])
-            .default_value("geojson")
+            .default_value_if("INPUT", Some("-"), "geojson")
             .takes_value(true))
         .arg(Arg::with_name("lon")
             .long("lon")
@@ -149,9 +149,21 @@ fn main() {
     let spinner = ProgressBar::new_spinner();
     spinner.set_message("Reading file");
     spinner.enable_steady_tick(1);
-
     spinner.set_message("Parsing geography");
-    let geoms: Vec<GridGeom<f64>> = match matches.value_of("format").unwrap() {
+
+    // Get file format from flag or infer from file path
+    let file_format = match matches.value_of("format") {
+        Some(f) => String::from(f),
+        _ => matches
+            .value_of("INPUT")
+            .unwrap()
+            .split('.')
+            .last()
+            .unwrap()
+            .to_ascii_lowercase(),
+    };
+
+    let geoms: Vec<GridGeom<f64>> = match file_format.as_ref() {
         "geojson" => {
             let input_str = read_input_to_string(matches.value_of("INPUT").unwrap());
             let gj: GeoJson = input_str
