@@ -32,15 +32,10 @@ jobs:
       - run: conventional-changelog -p conventional -i CHANGELOG.md -s
 
       - name: Create release from changelog
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: ncipollo/release-action@v1
         with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body_path: CHANGELOG.md
-          draft: false
-          prerelease: false
+          bodyFile: CHANGELOG.md
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   publish-release-assets:
     name: Publish release assets for ${{ matrix.os }}
