@@ -29,7 +29,7 @@ jobs:
       
       - run: npm install -g conventional-changelog-cli
 
-      - run: conventional-changelog -p conventional -i CHANGELOG.md -s
+      - run: conventional-changelog -p conventional -i CHANGELOG.md -s -r 2
 
       - name: Create release from changelog
         uses: ncipollo/release-action@v1
