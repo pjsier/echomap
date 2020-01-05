@@ -12,6 +12,7 @@ use rstar::{self, RTree, RTreeNum, RTreeObject, AABB};
 const CELL_ROWS: i32 = 4;
 const CELL_COLS: i32 = 2;
 
+#[derive(Debug, PartialEq)]
 pub enum GridGeom<T>
 where
     T: CoordinateType + Float + RTreeNum + FromPrimitive,
@@ -234,13 +235,33 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    use geo_types::LineString;
+    use num_traits::cast::ToPrimitive;
+
+    #[test]
+    fn test_vec_from_geom() {
+        let poly = Polygon::new(LineString::from(vec![(0., 0.), (1., 1.), (1., 0.)]), vec![]);
+        assert_eq!(
+            GridGeom::<f64>::vec_from_geom(Geometry::Polygon(poly.clone()), false),
+            vec![
+                GridGeom::Line(Line::<f64>::new((0., 0.), (1., 1.))),
+                GridGeom::Line(Line::<f64>::new((1., 1.), (1., 0.))),
+                GridGeom::Line(Line::<f64>::new((1., 0.), (0., 0.))),
+            ]
+        );
+        assert_eq!(
+            GridGeom::<f64>::vec_from_geom(Geometry::Polygon(poly.clone()), true),
+            vec![GridGeom::Polygon(poly)]
+        );
+    }
 
     #[test]
     fn new_clamps_aspect_ratio() {
         let line = GridGeom::Line(Line::new([0., 0.], [5., 1.]));
         let rtree = RTree::bulk_load(vec![line]);
-        let grid = MapGrid::new(1., 5., rtree);
-        assert_eq!((grid.cols, grid.rows), (1, 5));
+        let grid = MapGrid::new(4., 4., rtree);
+        assert_eq!((grid.cols, grid.rows), (4, 4));
+        assert_eq!(grid.cell_size, [1.25, 2.5]);
     }
 
     #[test]
@@ -251,5 +272,25 @@ mod test {
         ]);
         let grid = MapGrid::new(4., 4., rtree);
         assert_eq!(grid.query_cell_value(0, 0), 0x36);
+    }
+
+    #[test]
+    fn min_max_points() {
+        let rtree = RTree::bulk_load(vec![
+            GridGeom::Line(Line::new([0., 0.], [4., 0.])),
+            GridGeom::Point(Point::new(0., 1.)),
+        ]);
+        let grid = MapGrid::new(4., 4., rtree);
+        let (row, col) = (0, 0);
+        let start_width = (grid.cell_size[0] * f64::from(col)) + grid.bbox.min.x.to_f64().unwrap();
+        let start_height = grid.bbox.max.y.to_f64().unwrap() - (grid.cell_size[1] * f64::from(row));
+        assert_eq!(
+            grid.min_max_points(0, 0, start_width, start_height),
+            (Point::<f64>::new(0., 0.5,), Point::<f64>::new(0.5, 1.))
+        );
+        assert_eq!(
+            grid.min_max_points(4, 1, start_width, start_height),
+            (Point::<f64>::new(0.5, -1.5), Point::<f64>::new(1.0, -1.))
+        );
     }
 }

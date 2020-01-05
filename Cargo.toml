@@ -9,7 +9,7 @@ repository = "https://github.com/pjsier/echomap"
 license = "MIT"
 edition = "2018"
 keywords = ["geo", "map", "gis", "cli"]
-exclude = [".github/*", "img/*"]
+exclude = [".github/*", "img/*", "fixtures/*"]
 
 [dependencies]
 geo = "0.12"

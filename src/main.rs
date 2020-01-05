@@ -18,6 +18,7 @@ use topojson::{to_geojson, TopoJson};
 mod map_grid;
 use map_grid::{GridGeom, MapGrid};
 
+#[derive(Debug, PartialEq)]
 enum InputFormat {
     GeoJson,
     TopoJson,
@@ -94,16 +95,14 @@ pub fn process_geojson(gj: GeoJson, is_area: bool) -> Vec<GridGeom<f64>> {
     }
 }
 
-fn handle_geojson(file_path: &str, area: bool) -> Vec<GridGeom<f64>> {
-    let input_str = read_input_to_string(file_path);
+fn handle_geojson(input_str: String, area: bool) -> Vec<GridGeom<f64>> {
     let gj: GeoJson = input_str
         .parse::<GeoJson>()
         .expect("Unable to parse GeoJSON");
     process_geojson(gj, area)
 }
 
-fn handle_topojson(file_path: &str, area: bool) -> Vec<GridGeom<f64>> {
-    let input_str = read_input_to_string(file_path);
+fn handle_topojson(input_str: String, area: bool) -> Vec<GridGeom<f64>> {
     let topo = input_str
         .parse::<TopoJson>()
         .expect("Unable to parse TopoJSON");
@@ -120,8 +119,7 @@ fn handle_topojson(file_path: &str, area: bool) -> Vec<GridGeom<f64>> {
     }
 }
 
-fn handle_csv(file_path: &str, lat_col: &str, lon_col: &str) -> Vec<GridGeom<f64>> {
-    let input_str = read_input_to_string(file_path);
+fn handle_csv(input_str: String, lat_col: &str, lon_col: &str) -> Vec<GridGeom<f64>> {
     let mut rdr = csv::Reader::from_reader(input_str.as_bytes());
     let headers = rdr.headers().expect("Unable to load CSV headers");
 
@@ -224,15 +222,15 @@ fn main() {
 
     let geoms: Vec<GridGeom<f64>> = match file_format {
         InputFormat::GeoJson => handle_geojson(
-            matches.value_of("INPUT").unwrap(),
+            read_input_to_string(matches.value_of("INPUT").unwrap()),
             matches.is_present("area"),
         ),
         InputFormat::TopoJson => handle_topojson(
-            matches.value_of("INPUT").unwrap(),
+            read_input_to_string(matches.value_of("INPUT").unwrap()),
             matches.is_present("area"),
         ),
         InputFormat::Csv => handle_csv(
-            matches.value_of("INPUT").unwrap(),
+            read_input_to_string(matches.value_of("INPUT").unwrap()),
             matches.value_of("lat").unwrap(),
             matches.value_of("lon").unwrap(),
         ),
@@ -258,4 +256,81 @@ fn main() {
     let grid = MapGrid::new(width, height, rtree);
     spinner.finish_and_clear();
     grid.print();
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use geo_types::Point;
+
+    #[test]
+    fn test_get_file_format() {
+        assert_eq!(get_file_format("test.GEOJSON", None), InputFormat::GeoJson);
+        assert_eq!(
+            get_file_format("test.geojson", Some("csv")),
+            InputFormat::Csv
+        );
+    }
+
+    #[test]
+    fn test_handle_geojson() {
+        let input_str = include_str!("../fixtures/input.geojson").to_string();
+        let outlines = handle_geojson(input_str.clone(), false);
+        let lines = outlines
+            .iter()
+            .filter(|g| match g {
+                GridGeom::Line(_) => true,
+                _ => false,
+            })
+            .collect::<Vec<&GridGeom<f64>>>();
+        let areas = handle_geojson(input_str, true);
+        let poly = areas
+            .iter()
+            .filter(|g| match g {
+                GridGeom::Polygon(_) => true,
+                _ => false,
+            })
+            .collect::<Vec<&GridGeom<f64>>>();
+        assert_eq!(outlines.len(), 14);
+        assert_eq!(lines.len(), 13);
+        assert_eq!(areas.len(), 5);
+        assert_eq!(poly.len(), 3);
+    }
+
+    #[test]
+    fn test_handle_topojson() {
+        let input_str = include_str!("../fixtures/input.topojson").to_string();
+        let outlines = handle_topojson(input_str.clone(), false);
+        let lines = outlines
+            .iter()
+            .filter(|g| match g {
+                GridGeom::Line(_) => true,
+                _ => false,
+            })
+            .collect::<Vec<&GridGeom<f64>>>();
+        let areas = handle_topojson(input_str, true);
+        let poly = areas
+            .iter()
+            .filter(|g| match g {
+                GridGeom::Polygon(_) => true,
+                _ => false,
+            })
+            .collect::<Vec<&GridGeom<f64>>>();
+        assert_eq!(outlines.len(), 14);
+        assert_eq!(lines.len(), 13);
+        assert_eq!(areas.len(), 5);
+        assert_eq!(poly.len(), 3);
+    }
+
+    #[test]
+    fn test_handle_csv() {
+        let input_str = include_str!("../fixtures/input.csv").to_string();
+        assert_eq!(
+            handle_csv(input_str, "one", "two"),
+            vec![
+                GridGeom::Point(Point::<f64>::new(-1.0, 1.0)),
+                GridGeom::Point(Point::<f64>::new(-2.0, 2.0))
+            ]
+        );
+    }
 }
