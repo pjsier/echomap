@@ -4,6 +4,7 @@ use std::io::{self, Write};
 use geo::algorithm::bounding_rect::BoundingRect;
 use geo::algorithm::contains::Contains;
 use geo::algorithm::intersects::Intersects;
+use geo_types::Geometry;
 use geo_types::{CoordinateType, Line, Point, Polygon, Rect};
 use num_traits::{Float, FromPrimitive};
 use rstar::{self, RTree, RTreeNum, RTreeObject, AABB};
@@ -18,6 +19,47 @@ where
     Point(Point<T>),
     Line(Line<T>),
     Polygon(Polygon<T>),
+}
+
+impl<T> GridGeom<T>
+where
+    T: CoordinateType + Float + RTreeNum + FromPrimitive,
+{
+    /// Simplify geometries into component pieces for GridGeom
+    pub fn vec_from_geom(geom: Geometry<f64>, is_area: bool) -> Vec<GridGeom<f64>> {
+        match geom {
+            Geometry::Point(s) => vec![GridGeom::Point(s)],
+            Geometry::MultiPoint(s) => s.into_iter().map(GridGeom::Point).collect(),
+            Geometry::Line(s) => vec![GridGeom::Line(s)],
+            Geometry::LineString(s) => s.lines().map(GridGeom::Line).collect(),
+            Geometry::MultiLineString(s) => s
+                .into_iter()
+                .flat_map(|ls| ls.lines().collect::<Vec<_>>())
+                .map(GridGeom::Line)
+                .collect(),
+            Geometry::Polygon(s) => {
+                if is_area {
+                    vec![GridGeom::Polygon(s)]
+                } else {
+                    s.exterior().lines().map(GridGeom::Line).collect()
+                }
+            }
+            Geometry::MultiPolygon(s) => {
+                if is_area {
+                    s.into_iter().map(GridGeom::Polygon).collect()
+                } else {
+                    s.into_iter()
+                        .flat_map(|p| p.exterior().lines().collect::<Vec<_>>())
+                        .map(GridGeom::Line)
+                        .collect()
+                }
+            }
+            Geometry::GeometryCollection(s) => s
+                .into_iter()
+                .flat_map(|g| GridGeom::<T>::vec_from_geom(g, is_area))
+                .collect(),
+        }
+    }
 }
 
 impl<T> RTreeObject for GridGeom<T>
@@ -133,27 +175,35 @@ where
         }
     }
 
+    // Get the minimum and maximum points of a cell
+    fn min_max_points(
+        &self,
+        row: i32,
+        col: i32,
+        start_width: f64,
+        start_height: f64,
+    ) -> (Point<T>, Point<T>) {
+        let cell_min_x = start_width + (self.inner_cell_size[0] * f64::from(col));
+        let cell_max_y = start_height - (self.inner_cell_size[1] * f64::from(row));
+        let cell_max_x = T::from_f64(cell_min_x + self.inner_cell_size[0]).unwrap();
+        let cell_min_y = T::from_f64(cell_max_y - self.inner_cell_size[1]).unwrap();
+
+        let min_pt = Point::new(T::from_f64(cell_min_x).unwrap(), cell_min_y);
+        let max_pt = Point::new(cell_max_x, T::from_f64(cell_max_y).unwrap());
+        (min_pt, max_pt)
+    }
+
     /// For a given Braille 2x4 cell, query which cells have lines in them
     fn query_cell_value(&self, row: i32, col: i32) -> u32 {
         let mut cell_value = 0x00;
 
         // Get the start offset dimensions based on the outer row and column
-        let cell_start_width =
-            (self.cell_size[0] * f64::from(col)) + self.bbox.min.x.to_f64().unwrap();
-        let cell_start_height =
-            self.bbox.max.y.to_f64().unwrap() - (self.cell_size[1] * f64::from(row));
+        let start_width = (self.cell_size[0] * f64::from(col)) + self.bbox.min.x.to_f64().unwrap();
+        let start_height = self.bbox.max.y.to_f64().unwrap() - (self.cell_size[1] * f64::from(row));
 
         for r in 0..CELL_ROWS {
             for c in 0..CELL_COLS {
-                // Generate an envelope from the coordinates of the current cell
-                let cell_min_x = cell_start_width + (self.inner_cell_size[0] * f64::from(c));
-                let cell_max_y = cell_start_height - (self.inner_cell_size[1] * f64::from(r));
-                let cell_max_x = T::from_f64(cell_min_x + self.inner_cell_size[0]).unwrap();
-                let cell_min_y = T::from_f64(cell_max_y - self.inner_cell_size[1]).unwrap();
-
-                let min_pt = Point::new(T::from_f64(cell_min_x).unwrap(), cell_min_y);
-                let max_pt = Point::new(cell_max_x, T::from_f64(cell_max_y).unwrap());
-
+                let (min_pt, max_pt) = self.min_max_points(r, c, start_width, start_height);
                 let envelope =
                     AABB::from_corners([min_pt.x(), min_pt.y()], [max_pt.x(), max_pt.y()]);
 
