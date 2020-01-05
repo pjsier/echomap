@@ -1,6 +1,6 @@
 [package]
 name = "echomap"
-version = "0.2.5"
+version = "0.3.0"
 authors = ["Pat Sier <pjsier@gmail.com>"]
 description = "A command line tool for previewing map files in the terminal"
 readme = "README.md"
