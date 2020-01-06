@@ -27,7 +27,7 @@ where
     T: CoordinateType + Float + RTreeNum + FromPrimitive,
 {
     /// Simplify geometries into component pieces for GridGeom
-    pub fn vec_from_geom(geom: Geometry<f64>, is_area: bool) -> Vec<GridGeom<f64>> {
+    pub fn vec_from_geom(geom: Geometry<T>, is_area: bool) -> Vec<GridGeom<T>> {
         match geom {
             Geometry::Point(s) => vec![GridGeom::Point(s)],
             Geometry::MultiPoint(s) => s.into_iter().map(GridGeom::Point).collect(),
