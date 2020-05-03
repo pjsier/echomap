@@ -1,5 +1,9 @@
 pre-commit:
+  parallel: true
   commands:
+    lint:
+      glob: "*.rs"
+      run: cargo clippy --all-targets --all-features -- -D warnings
     format:
       glob: "*.rs"
       run: cargo fmt --all -- --check
