@@ -25,14 +25,15 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
-    -c, --columns <COLUMNS>    Sets the number of columns (in characters) of the printed output. Defaults to terminal
-                               height minus 1.
-    -f, --format <FORMAT>      Input file format (tries to infer from file extension by default) [possible values:
-                               geojson, topojson, csv, shp]
-        --lat <LAT>            Name of latitude column (if format is 'csv')
-        --lon <LON>            Name of longitude column (if format is 'csv')
-    -r, --rows <ROWS>          Sets the number of rows (in characters) of the printed output. Defaults to terminal
-                               width.
+    -c, --columns <COLUMNS>      Sets the number of columns (in characters) of the printed output. Defaults to terminal
+                                 height minus 1.
+    -f, --format <FORMAT>        Input file format (tries to infer from file extension by default) [possible values:
+                                 geojson, topojson, csv, shp]
+        --lat <LAT>              Name of latitude column (if format is 'csv')
+        --lon <LON>              Name of longitude column (if format is 'csv')
+    -r, --rows <ROWS>            Sets the number of rows (in characters) of the printed output. Defaults to terminal
+                                 width.
+    -s, --simplify <simplify>    Proportion of removable points to remove (0-1 or 0%-100%) [default: 0.01]
 
 ARGS:
     <INPUT>    File to parse or '-' to read stdin

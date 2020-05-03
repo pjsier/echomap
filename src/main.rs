@@ -49,6 +49,15 @@ fn get_file_format(file_path: &str, file_format: Option<&str>) -> InputFormat {
     format_str.parse().expect("Invalid format supplied")
 }
 
+/// Parse simplification value from float or percentage string
+fn get_simplification(simplify: &str) -> f64 {
+    if simplify.contains('%') {
+        simplify.replace("%", "").parse::<f64>().unwrap() / 100.
+    } else {
+        simplify.parse::<f64>().unwrap()
+    }
+}
+
 /// Read file path (or stdin) to string
 fn read_input_to_string(file_path: &str) -> String {
     let mut input_str = String::new();
@@ -69,7 +78,7 @@ fn read_input_to_string(file_path: &str) -> String {
 }
 
 /// Process top-level GeoJSON items
-pub fn process_geojson(gj: GeoJson, is_area: bool) -> Vec<GridGeom<f64>> {
+pub fn process_geojson(gj: GeoJson, simplification: f64, is_area: bool) -> Vec<GridGeom<f64>> {
     match gj {
         GeoJson::FeatureCollection(collection) => collection
             .features
@@ -77,32 +86,32 @@ pub fn process_geojson(gj: GeoJson, is_area: bool) -> Vec<GridGeom<f64>> {
             .filter_map(|feature| feature.geometry)
             .flat_map(|g| {
                 let geom: Geometry<f64> = g.value.try_into().unwrap();
-                GridGeom::<f64>::vec_from_geom(geom, is_area)
+                GridGeom::<f64>::vec_from_geom(geom, simplification, is_area)
             })
             .collect(),
         GeoJson::Feature(feature) => {
             if let Some(geometry) = feature.geometry {
                 let geom: Geometry<f64> = geometry.value.try_into().unwrap();
-                GridGeom::<f64>::vec_from_geom(geom, is_area)
+                GridGeom::<f64>::vec_from_geom(geom, simplification, is_area)
             } else {
                 vec![]
             }
         }
         GeoJson::Geometry(geometry) => {
             let geom: Geometry<f64> = geometry.value.try_into().unwrap();
-            GridGeom::<f64>::vec_from_geom(geom, is_area)
+            GridGeom::<f64>::vec_from_geom(geom, simplification, is_area)
         }
     }
 }
 
-fn handle_geojson(input_str: String, area: bool) -> Vec<GridGeom<f64>> {
+fn handle_geojson(input_str: String, simplification: f64, is_area: bool) -> Vec<GridGeom<f64>> {
     let gj: GeoJson = input_str
         .parse::<GeoJson>()
         .expect("Unable to parse GeoJSON");
-    process_geojson(gj, area)
+    process_geojson(gj, simplification, is_area)
 }
 
-fn handle_topojson(input_str: String, area: bool) -> Vec<GridGeom<f64>> {
+fn handle_topojson(input_str: String, simplification: f64, is_area: bool) -> Vec<GridGeom<f64>> {
     let topo = input_str
         .parse::<TopoJson>()
         .expect("Unable to parse TopoJSON");
@@ -113,7 +122,7 @@ fn handle_topojson(input_str: String, area: bool) -> Vec<GridGeom<f64>> {
             .map(|n| to_geojson(&t, &n))
             .filter_map(|g| g.ok())
             .map(GeoJson::FeatureCollection)
-            .flat_map(|g| process_geojson(g, area))
+            .flat_map(|g| process_geojson(g, simplification, is_area))
             .collect(),
         _ => unimplemented!(),
     }
@@ -151,13 +160,13 @@ fn handle_csv(input_str: String, lat_col: &str, lon_col: &str) -> Vec<GridGeom<f
         .collect()
 }
 
-fn handle_shp(file_path: &str, area: bool) -> Vec<GridGeom<f64>> {
+fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Vec<GridGeom<f64>> {
     let rdr =
         shapefile::Reader::from_path(file_path).expect("There was an error opening the shapefile");
     rdr.iter_shapes()
         .filter_map(|s| s.ok())
         .flat_map(|s| match Geometry::<f64>::try_from(s) {
-            Ok(geom) => GridGeom::<f64>::vec_from_geom(geom, area),
+            Ok(geom) => GridGeom::<f64>::vec_from_geom(geom, simplification, is_area),
             Err(_) => vec![],
         })
         .collect()
@@ -204,11 +213,31 @@ fn main() {
             .value_name("COLUMNS")
             .help("Sets the number of columns (in characters) of the printed output. Defaults to terminal height minus 1.")
             .takes_value(true))
+        .arg(Arg::with_name("simplify")
+            .short("s")
+            .long("simplify")
+            .help("Proportion of removable points to remove (0-1 or 0%-100%)")
+            .takes_value(true)
+            .default_value(&"0.01"))
         .arg(Arg::with_name("area")
             .short("a")
             .long("area")
             .help("Print polygon area instead of boundaries"))
         .get_matches();
+
+    let (term_height, term_width) = Term::stdout().size();
+    let height: f64 = match matches.value_of("rows") {
+        Some(ref rows) => rows.parse().expect("Rows cannot be parsed as a number."),
+        None => f64::from(term_height - 1),
+    };
+    let width: f64 = match matches.value_of("columns") {
+        Some(ref cols) => cols.parse().expect("Columns cannot be parsed as a number."),
+        None => f64::from(term_width),
+    };
+
+    // Simplification is scaled by the output size
+    let simplify = get_simplification(matches.value_of("simplify").unwrap());
+    let simplification = simplify / (height * width);
 
     let spinner = ProgressBar::new_spinner();
     spinner.set_message("Reading file");
@@ -223,10 +252,12 @@ fn main() {
     let geoms: Vec<GridGeom<f64>> = match file_format {
         InputFormat::GeoJson => handle_geojson(
             read_input_to_string(matches.value_of("INPUT").unwrap()),
+            simplification,
             matches.is_present("area"),
         ),
         InputFormat::TopoJson => handle_topojson(
             read_input_to_string(matches.value_of("INPUT").unwrap()),
+            simplification,
             matches.is_present("area"),
         ),
         InputFormat::Csv => handle_csv(
@@ -236,6 +267,7 @@ fn main() {
         ),
         InputFormat::Shapefile => handle_shp(
             matches.value_of("INPUT").unwrap(),
+            simplification,
             matches.is_present("area"),
         ),
     };
@@ -243,16 +275,6 @@ fn main() {
     // Create a combined LineString for bounds calculation
     spinner.set_message("Indexing geography");
     let rtree: RTree<GridGeom<f64>> = RTree::bulk_load(geoms);
-
-    let (term_height, term_width) = Term::stdout().size();
-    let height: f64 = match matches.value_of("rows") {
-        Some(ref rows) => rows.parse().expect("Rows cannot be parsed as a number."),
-        None => f64::from(term_height - 1),
-    };
-    let width: f64 = match matches.value_of("columns") {
-        Some(ref cols) => cols.parse().expect("Columns cannot be parsed as a number."),
-        None => f64::from(term_width),
-    };
     let grid = MapGrid::new(width, height, rtree);
     spinner.finish_and_clear();
     grid.print();
@@ -275,7 +297,7 @@ mod test {
     #[test]
     fn test_handle_geojson() {
         let input_str = include_str!("../fixtures/input.geojson").to_string();
-        let outlines = handle_geojson(input_str.clone(), false);
+        let outlines = handle_geojson(input_str.clone(), 0., false);
         let lines = outlines
             .iter()
             .filter(|g| match g {
@@ -283,7 +305,7 @@ mod test {
                 _ => false,
             })
             .collect::<Vec<&GridGeom<f64>>>();
-        let areas = handle_geojson(input_str, true);
+        let areas = handle_geojson(input_str, 0., true);
         let poly = areas
             .iter()
             .filter(|g| match g {
@@ -300,7 +322,7 @@ mod test {
     #[test]
     fn test_handle_topojson() {
         let input_str = include_str!("../fixtures/input.topojson").to_string();
-        let outlines = handle_topojson(input_str.clone(), false);
+        let outlines = handle_topojson(input_str.clone(), 0., false);
         let lines = outlines
             .iter()
             .filter(|g| match g {
@@ -308,7 +330,7 @@ mod test {
                 _ => false,
             })
             .collect::<Vec<&GridGeom<f64>>>();
-        let areas = handle_topojson(input_str, true);
+        let areas = handle_topojson(input_str, 0., true);
         let poly = areas
             .iter()
             .filter(|g| match g {

@@ -4,6 +4,7 @@ use std::io::{self, Write};
 use geo::algorithm::bounding_rect::BoundingRect;
 use geo::algorithm::contains::Contains;
 use geo::algorithm::intersects::Intersects;
+use geo::algorithm::simplifyvw::SimplifyVW;
 use geo_types::Geometry;
 use geo_types::{CoordinateType, Line, Point, Polygon, Rect};
 use num_traits::{Float, FromPrimitive};
@@ -27,29 +28,42 @@ where
     T: CoordinateType + Float + RTreeNum + FromPrimitive,
 {
     /// Simplify geometries into component pieces for GridGeom
-    pub fn vec_from_geom(geom: Geometry<T>, is_area: bool) -> Vec<GridGeom<T>> {
+    pub fn vec_from_geom(geom: Geometry<T>, simplification: T, is_area: bool) -> Vec<GridGeom<T>> {
         match geom {
             Geometry::Point(s) => vec![GridGeom::Point(s)],
             Geometry::MultiPoint(s) => s.into_iter().map(GridGeom::Point).collect(),
             Geometry::Line(s) => vec![GridGeom::Line(s)],
-            Geometry::LineString(s) => s.lines().map(GridGeom::Line).collect(),
+            Geometry::LineString(s) => s
+                .simplifyvw(&simplification)
+                .lines()
+                .map(GridGeom::Line)
+                .collect(),
             Geometry::MultiLineString(s) => s
                 .into_iter()
+                .map(|ls| ls.simplifyvw(&simplification))
                 .flat_map(|ls| ls.lines().collect::<Vec<_>>())
                 .map(GridGeom::Line)
                 .collect(),
             Geometry::Polygon(s) => {
                 if is_area {
-                    vec![GridGeom::Polygon(s)]
+                    vec![GridGeom::Polygon(s.simplifyvw(&simplification))]
                 } else {
-                    s.exterior().lines().map(GridGeom::Line).collect()
+                    s.simplifyvw(&simplification)
+                        .exterior()
+                        .lines()
+                        .map(GridGeom::Line)
+                        .collect()
                 }
             }
             Geometry::MultiPolygon(s) => {
                 if is_area {
-                    s.into_iter().map(GridGeom::Polygon).collect()
+                    s.simplifyvw(&simplification)
+                        .into_iter()
+                        .map(GridGeom::Polygon)
+                        .collect()
                 } else {
-                    s.into_iter()
+                    s.simplifyvw(&simplification)
+                        .into_iter()
                         .flat_map(|p| p.exterior().lines().collect::<Vec<_>>())
                         .map(GridGeom::Line)
                         .collect()
@@ -57,7 +71,7 @@ where
             }
             Geometry::GeometryCollection(s) => s
                 .into_iter()
-                .flat_map(|g| GridGeom::<T>::vec_from_geom(g, is_area))
+                .flat_map(|g| GridGeom::<T>::vec_from_geom(g, simplification, is_area))
                 .collect(),
         }
     }
@@ -242,7 +256,7 @@ mod test {
     fn test_vec_from_geom() {
         let poly = Polygon::new(LineString::from(vec![(0., 0.), (1., 1.), (1., 0.)]), vec![]);
         assert_eq!(
-            GridGeom::<f64>::vec_from_geom(Geometry::Polygon(poly.clone()), false),
+            GridGeom::<f64>::vec_from_geom(Geometry::Polygon(poly.clone()), 0.01, false),
             vec![
                 GridGeom::Line(Line::<f64>::new((0., 0.), (1., 1.))),
                 GridGeom::Line(Line::<f64>::new((1., 1.), (1., 0.))),
@@ -250,7 +264,7 @@ mod test {
             ]
         );
         assert_eq!(
-            GridGeom::<f64>::vec_from_geom(Geometry::Polygon(poly.clone()), true),
+            GridGeom::<f64>::vec_from_geom(Geometry::Polygon(poly.clone()), 0.01, true),
             vec![GridGeom::Polygon(poly)]
         );
     }
