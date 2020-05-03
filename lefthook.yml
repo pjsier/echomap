@@ -1,0 +1,10 @@
+pre-commit:
+  commands:
+    format:
+      glob: "*.rs"
+      run: cargo fmt --all -- --check
+
+commit-msg:
+  commands:
+    commitlint:
+      run: commitlint -e -x @commitlint/config-conventional
