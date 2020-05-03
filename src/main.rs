@@ -7,12 +7,10 @@ extern crate clap;
 
 use clap::{App, Arg};
 use console::Term;
-use csv;
 use geo_types::{Geometry, Point};
 use geojson::{self, GeoJson};
 use indicatif::ProgressBar;
 use rstar::RTree;
-use shapefile;
 use topojson::{to_geojson, TopoJson};
 
 mod map_grid;
