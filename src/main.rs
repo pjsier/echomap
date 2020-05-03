@@ -172,7 +172,7 @@ fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Vec<GridGe
 
 fn main() {
     let matches = App::new("echomap")
-        .version("0.3.0")
+        .version("0.4.0")
         .about("Preview map files in the terminal")
         .author("Pat Sier <pjsier@gmail.com>")
         .arg(Arg::with_name("INPUT")

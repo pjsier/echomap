@@ -159,7 +159,7 @@ dependencies = [
 
 [[package]]
 name = "echomap"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "clap 2.33.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "console 0.8.0 (registry+https://github.com/rust-lang/crates.io-index)",
