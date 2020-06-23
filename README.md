@@ -5,7 +5,7 @@
 
 Preview map files in the terminal
 
-![Terminal recording gif](https://raw.githubusercontent.com/pjsier/echomap/master/img/recording.gif?raw=true)
+![Terminal recording gif](https://raw.githubusercontent.com/pjsier/echomap/main/img/recording.gif?raw=true)
 
 ## Installation
 
