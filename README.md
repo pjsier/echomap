@@ -1,7 +1,7 @@
 # `echomap`
 
 [![crates.io](https://img.shields.io/crates/v/echomap.svg)](https://crates.io/crates/echomap)
-![Build status](https://github.com/pjsier/echomap/workflows/CI%20Checks/badge.svg)
+![Build status](https://github.com/pjsier/echomap/workflows/CI/badge.svg)
 
 Preview map files in the terminal
 
