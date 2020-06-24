@@ -249,6 +249,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
+    use float_cmp::approx_eq;
     use geo_types::LineString;
     use num_traits::cast::ToPrimitive;
 
@@ -275,7 +276,8 @@ mod test {
         let rtree = RTree::bulk_load(vec![line]);
         let grid = MapGrid::new(4., 4., rtree);
         assert_eq!((grid.cols, grid.rows), (4, 4));
-        assert_eq!(grid.cell_size, [1.25, 2.5]);
+        assert!(approx_eq!(f64, grid.cell_size[0], 1.25));
+        assert!(approx_eq!(f64, grid.cell_size[1], 2.5));
     }
 
     #[test]
