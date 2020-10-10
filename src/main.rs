@@ -184,10 +184,7 @@ fn handle_wkt(input_str: String) -> Vec<GridGeom<f64>> {
             vec![geo]
         })
         .flat_map(|geo| {
-            let is_area = match geo {
-                Geometry::Polygon(_) | Geometry::MultiPolygon(_) => true,
-                _ => false,
-            };
+            let is_area = matches!(geo, Geometry::Polygon(_) | Geometry::MultiPolygon(_));
             GridGeom::<f64>::vec_from_geom(geo, 0.0, is_area)
         })
         .collect()
