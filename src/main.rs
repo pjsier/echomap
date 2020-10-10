@@ -3,8 +3,6 @@ use std::fs;
 use std::io::{self, Read};
 use std::str::FromStr;
 
-extern crate clap;
-
 use clap::{App, Arg};
 use console::Term;
 use geo_types::{Geometry, Point};
@@ -296,50 +294,26 @@ mod test {
     fn test_handle_geojson() {
         let input_str = include_str!("../fixtures/input.geojson").to_string();
         let outlines = handle_geojson(input_str.clone(), 0., false);
-        let lines = outlines
-            .iter()
-            .filter(|g| match g {
-                GridGeom::Line(_) => true,
-                _ => false,
-            })
-            .collect::<Vec<&GridGeom<f64>>>();
+        let lines = outlines.iter().filter(|g| matches!(g, GridGeom::Line(_)));
         let areas = handle_geojson(input_str, 0., true);
-        let poly = areas
-            .iter()
-            .filter(|g| match g {
-                GridGeom::Polygon(_) => true,
-                _ => false,
-            })
-            .collect::<Vec<&GridGeom<f64>>>();
+        let poly = areas.iter().filter(|g| matches!(g, GridGeom::Polygon(_)));
         assert_eq!(outlines.len(), 14);
-        assert_eq!(lines.len(), 13);
+        assert_eq!(lines.count(), 13);
         assert_eq!(areas.len(), 5);
-        assert_eq!(poly.len(), 3);
+        assert_eq!(poly.count(), 3);
     }
 
     #[test]
     fn test_handle_topojson() {
         let input_str = include_str!("../fixtures/input.topojson").to_string();
         let outlines = handle_topojson(input_str.clone(), 0., false);
-        let lines = outlines
-            .iter()
-            .filter(|g| match g {
-                GridGeom::Line(_) => true,
-                _ => false,
-            })
-            .collect::<Vec<&GridGeom<f64>>>();
+        let lines = outlines.iter().filter(|g| matches!(g, GridGeom::Line(_)));
         let areas = handle_topojson(input_str, 0., true);
-        let poly = areas
-            .iter()
-            .filter(|g| match g {
-                GridGeom::Polygon(_) => true,
-                _ => false,
-            })
-            .collect::<Vec<&GridGeom<f64>>>();
+        let poly = areas.iter().filter(|g| matches!(g, GridGeom::Polygon(_)));
         assert_eq!(outlines.len(), 14);
-        assert_eq!(lines.len(), 13);
+        assert_eq!(lines.count(), 13);
         assert_eq!(areas.len(), 5);
-        assert_eq!(poly.len(), 3);
+        assert_eq!(poly.count(), 3);
     }
 
     #[test]
