@@ -14,12 +14,15 @@ use topojson::{to_geojson, TopoJson};
 mod map_grid;
 use map_grid::{GridGeom, MapGrid};
 
+mod wkt_mapper;
+
 #[derive(Debug, PartialEq)]
 enum InputFormat {
     GeoJson,
     TopoJson,
     Csv,
     Shapefile,
+    Wkt,
 }
 
 impl FromStr for InputFormat {
@@ -31,6 +34,7 @@ impl FromStr for InputFormat {
             "topojson" => Ok(InputFormat::TopoJson),
             "csv" => Ok(InputFormat::Csv),
             "shp" => Ok(InputFormat::Shapefile),
+            "wkt" => Ok(InputFormat::Wkt),
             _ => Err(()),
         }
     }
@@ -168,6 +172,12 @@ fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Vec<GridGe
         .collect()
 }
 
+fn handle_wkt(input_str: String) -> Vec<GridGeom<f64>> {
+    let wkt = wkt::Wkt::<f64>::from_str(&input_str)
+        .expect("");
+    wkt_mapper::map(wkt)
+}
+
 fn main() {
     let matches = App::new("echomap")
         .version("0.4.0")
@@ -266,6 +276,7 @@ fn main() {
             simplification,
             matches.is_present("area"),
         ),
+        InputFormat::Wkt => handle_wkt(read_input_to_string(matches.value_of("INPUT").unwrap())),
     };
 
     // Create a combined LineString for bounds calculation
