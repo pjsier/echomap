@@ -10,11 +10,10 @@ use geojson::{self, GeoJson};
 use indicatif::ProgressBar;
 use rstar::RTree;
 use topojson::{to_geojson, TopoJson};
+use wkt::{Wkt, conversion::try_into_geometry};
 
 mod map_grid;
 use map_grid::{GridGeom, MapGrid};
-
-mod wkt_mapper;
 
 #[derive(Debug, PartialEq)]
 enum InputFormat {
@@ -173,8 +172,25 @@ fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Vec<GridGe
 }
 
 fn handle_wkt(input_str: String) -> Vec<GridGeom<f64>> {
-    let wkt = wkt::Wkt::<f64>::from_str(&input_str).expect("");
-    wkt_mapper::map(wkt)
+    let wkt = Wkt::<f64>::from_str(&input_str).expect("");
+    wkt.items
+        .into_iter()
+        .filter_map(|s| try_into_geometry(&s).ok())
+        .flat_map(|geo| {
+            // I'm supposing that GeometryCollection cannot be recursive
+            if let Geometry::GeometryCollection(c) = geo {
+                return c.0;
+            }
+            vec![geo]
+        })
+        .flat_map(|geo| {
+            let is_area = match geo {
+                Geometry::Polygon(_) | Geometry::MultiPolygon(_) => true,
+                _ => false,
+            };
+            GridGeom::<f64>::vec_from_geom(geo, 0.0, is_area)
+        })
+        .collect()
 }
 
 fn main() {
@@ -289,7 +305,7 @@ fn main() {
 #[cfg(test)]
 mod test {
     use super::*;
-    use geo_types::Point;
+    use geo_types::{Point, Line};
 
     #[test]
     fn test_get_file_format() {
@@ -334,6 +350,23 @@ mod test {
             vec![
                 GridGeom::Point(Point::<f64>::new(-1.0, 1.0)),
                 GridGeom::Point(Point::<f64>::new(-2.0, 2.0))
+            ]
+        );
+    }
+
+    #[test]
+    fn test_handle_wkt() {
+        let input_str = include_str!("../fixtures/input.wkt").to_string();
+        assert_eq!(
+            handle_wkt(input_str),
+            vec![
+                GridGeom::Point(Point::<f64>::new(4.0, 6.0)),
+                GridGeom::Line(
+                    Line::<f64>::new(
+                        (4.0, 6.0),
+                        (7.0, 10.0)
+                    )
+                ),
             ]
         );
     }
