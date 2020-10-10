@@ -10,7 +10,7 @@ use geojson::{self, GeoJson};
 use indicatif::ProgressBar;
 use rstar::RTree;
 use topojson::{to_geojson, TopoJson};
-use wkt::{Wkt, conversion::try_into_geometry};
+use wkt::{conversion::try_into_geometry, Wkt};
 
 mod map_grid;
 use map_grid::{GridGeom, MapGrid};
@@ -302,7 +302,7 @@ fn main() {
 #[cfg(test)]
 mod test {
     use super::*;
-    use geo_types::{Point, Line};
+    use geo_types::{Line, Point};
 
     #[test]
     fn test_get_file_format() {
@@ -358,12 +358,7 @@ mod test {
             handle_wkt(input_str),
             vec![
                 GridGeom::Point(Point::<f64>::new(4.0, 6.0)),
-                GridGeom::Line(
-                    Line::<f64>::new(
-                        (4.0, 6.0),
-                        (7.0, 10.0)
-                    )
-                ),
+                GridGeom::Line(Line::<f64>::new((4.0, 6.0), (7.0, 10.0))),
             ]
         );
     }
