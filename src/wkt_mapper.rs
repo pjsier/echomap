@@ -1,21 +1,8 @@
+use crate::GridGeom;
+use geo_types::{Coordinate, Geometry, LineString, MultiPoint, MultiPolygon, Point, Polygon};
 use wkt::{
-    Wkt,
-    Geometry as WktGeometry,
-    types::{
-        Point as WktPoint,
-        LineString as WktLineString,
-        Polygon as WktPolygon
-    }
-};
-use crate::{GridGeom};
-use geo_types::{
-    Geometry,
-    Point,
-    MultiPoint,
-    LineString,
-    Coordinate,
-    Polygon,
-    MultiPolygon
+    types::{LineString as WktLineString, Point as WktPoint, Polygon as WktPolygon},
+    Geometry as WktGeometry, Wkt,
 };
 
 fn map_point(point: WktPoint<f64>) -> Point<f64> {
@@ -24,7 +11,8 @@ fn map_point(point: WktPoint<f64>) -> Point<f64> {
 }
 
 fn map_line(linestring: WktLineString<f64>) -> LineString<f64> {
-    let coordinates = linestring.0
+    let coordinates = linestring
+        .0
         .into_iter()
         .map(|c| Coordinate::from((c.x, c.y)))
         .collect();
@@ -36,7 +24,8 @@ fn map_polygon(mut polygon: WktPolygon<f64>) -> Polygon<f64> {
         unimplemented!("Unimplemented: send a PR!")
     }
     let exterior = polygon.0.remove(0);
-    let exterior = exterior.0
+    let exterior = exterior
+        .0
         .into_iter()
         .map(|c| geo_types::Coordinate::from((c.x, c.y)))
         .collect();
@@ -46,67 +35,41 @@ fn map_polygon(mut polygon: WktPolygon<f64>) -> Polygon<f64> {
 }
 
 pub fn map(wkt: Wkt<f64>) -> Vec<GridGeom<f64>> {
-  wkt.items.into_iter()
-        .flat_map(|s| {
-            match s {
-                WktGeometry::Point(point) => {
-                    GridGeom::<f64>::vec_from_geom(
-                        Geometry::Point(map_point(point)),
-                        0.0,
-                    false
-                )
-            },
+    wkt.items
+        .into_iter()
+        .flat_map(|s| match s {
+            WktGeometry::Point(point) => {
+                GridGeom::<f64>::vec_from_geom(Geometry::Point(map_point(point)), 0.0, false)
+            }
             WktGeometry::MultiPoint(points) => {
-                let points = points.0
-                    .into_iter()
-                    .map(|p| map_point(p))
-                    .collect();
-                GridGeom::<f64>::vec_from_geom(
-                    Geometry::MultiPoint(MultiPoint(points)),
-                    0.0,
-                    false
-                )  
-            },
-            WktGeometry::LineString(linestring) => {
-                GridGeom::<f64>::vec_from_geom(
-                    Geometry::LineString(map_line(linestring)),
-                    0.0,
-                    false
-                )
-            },
+                let points = points.0.into_iter().map(map_point).collect();
+                GridGeom::<f64>::vec_from_geom(Geometry::MultiPoint(MultiPoint(points)), 0.0, false)
+            }
+            WktGeometry::LineString(linestring) => GridGeom::<f64>::vec_from_geom(
+                Geometry::LineString(map_line(linestring)),
+                0.0,
+                false,
+            ),
             WktGeometry::MultiLineString(multistrings) => {
-                let multistrings = multistrings.0
-                    .into_iter()
-                    .map(|linestring| map_line(linestring))
-                    .collect();
-                GridGeom::<f64>::vec_from_geom(
-                    Geometry::MultiLineString(multistrings),
-                    0.0,
-                    false
-                )
-            },
+                let multistrings = multistrings.0.into_iter().map(map_line).collect();
+                GridGeom::<f64>::vec_from_geom(Geometry::MultiLineString(multistrings), 0.0, false)
+            }
             WktGeometry::Polygon(polygon) => {
-                GridGeom::<f64>::vec_from_geom(
-                    Geometry::Polygon(map_polygon(polygon)),
-                    0.0,
-                    true
-                )
-            },
+                GridGeom::<f64>::vec_from_geom(Geometry::Polygon(map_polygon(polygon)), 0.0, true)
+            }
             WktGeometry::MultiPolygon(polygons) => {
-                let polygons = polygons.0
+                let polygons = polygons
+                    .0
                     .into_iter()
-                    .map(|polygon| map_polygon(polygon))
+                    .map(map_polygon)
                     .collect::<Vec<Polygon<f64>>>();
                 GridGeom::<f64>::vec_from_geom(
-                    Geometry::MultiPolygon(
-                        MultiPolygon::from(polygons)
-                    ),
+                    Geometry::MultiPolygon(MultiPolygon::from(polygons)),
                     0.0,
-                    true
+                    true,
                 )
-            },
-            _ => unimplemented!("Unimplemented: send a PR!")
-        }
-    })
-    .collect()
+            }
+            _ => unimplemented!("Unimplemented: send a PR!"),
+        })
+        .collect()
 }

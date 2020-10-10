@@ -173,8 +173,7 @@ fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Vec<GridGe
 }
 
 fn handle_wkt(input_str: String) -> Vec<GridGeom<f64>> {
-    let wkt = wkt::Wkt::<f64>::from_str(&input_str)
-        .expect("");
+    let wkt = wkt::Wkt::<f64>::from_str(&input_str).expect("");
     wkt_mapper::map(wkt)
 }
 
