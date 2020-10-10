@@ -8,6 +8,7 @@ use console::Term;
 use geo_types::{Geometry, Point};
 use geojson::{self, GeoJson};
 use indicatif::ProgressBar;
+use polyline::decode_polyline;
 use rstar::RTree;
 use topojson::{to_geojson, TopoJson};
 use wkt::{conversion::try_into_geometry, Wkt};
@@ -22,6 +23,7 @@ enum InputFormat {
     Csv,
     Shapefile,
     Wkt,
+    Polyline,
 }
 
 impl FromStr for InputFormat {
@@ -34,6 +36,7 @@ impl FromStr for InputFormat {
             "csv" => Ok(InputFormat::Csv),
             "shp" => Ok(InputFormat::Shapefile),
             "wkt" => Ok(InputFormat::Wkt),
+            "polyline" => Ok(InputFormat::Polyline),
             _ => Err(()),
         }
     }
@@ -180,6 +183,11 @@ fn handle_wkt(input_str: String, simplification: f64, is_area: bool) -> Vec<Grid
         .collect()
 }
 
+fn handle_polyline(input_str: String, precision: u32) -> Vec<GridGeom<f64>> {
+    let lines = decode_polyline(&input_str, precision).unwrap();
+    lines.lines().map(GridGeom::Line).collect()
+}
+
 fn main() {
     let matches = App::new("echomap")
         .version("0.4.0")
@@ -227,6 +235,11 @@ fn main() {
             .help("Proportion of removable points to remove (0-1 or 0%-100%)")
             .takes_value(true)
             .default_value(&"0.01"))
+        .arg(Arg::with_name("precision")
+            .long("precision")
+            .help("Precision value for polyline parsing")
+            .takes_value(true)
+            .default_value(&"3"))
         .arg(Arg::with_name("area")
             .short("a")
             .long("area")
@@ -246,6 +259,13 @@ fn main() {
     // Simplification is scaled by the output size
     let simplify = get_simplification(matches.value_of("simplify").unwrap());
     let simplification = simplify / (height * width);
+
+    let precision: u32 = match matches.value_of("precision") {
+        Some(ref precision) => precision
+            .parse()
+            .expect("Precision cannot be parsed as a number."),
+        None => 3 as u32,
+    };
 
     let spinner = ProgressBar::new_spinner();
     spinner.set_message("Reading file");
@@ -282,6 +302,10 @@ fn main() {
             read_input_to_string(matches.value_of("INPUT").unwrap()),
             simplification,
             matches.is_present("area"),
+        ),
+        InputFormat::Polyline => handle_polyline(
+            read_input_to_string(matches.value_of("INPUT").unwrap()),
+            precision,
         ),
     };
 
@@ -353,6 +377,18 @@ mod test {
             vec![
                 GridGeom::Point(Point::<f64>::new(4.0, 6.0)),
                 GridGeom::Line(Line::<f64>::new((4.0, 6.0), (7.0, 10.0))),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_handle_polyline() {
+        let input_str = include_str!("../fixtures/input.polyline").to_string();
+        assert_eq!(
+            handle_polyline(input_str, 5),
+            vec![
+                GridGeom::Line(Line::new((-120.2, 38.5), (-120.95, 40.7))),
+                GridGeom::Line(Line::new((-120.95, 40.7), (-126.453, 43.252)))
             ]
         );
     }
