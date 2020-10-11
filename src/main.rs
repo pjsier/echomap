@@ -209,7 +209,7 @@ fn main() {
             .long("format")
             .value_name("FORMAT")
             .help("Input file format (tries to infer from file extension by default)")
-            .possible_values(&["geojson", "topojson", "csv", "shp", "polyline"])
+            .possible_values(&["geojson", "topojson", "csv", "shp", "wkt", "polyline"])
             .default_value_if("INPUT", Some("-"), "geojson")
             .takes_value(true))
         .arg(Arg::with_name("lon")
