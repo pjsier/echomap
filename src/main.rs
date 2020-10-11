@@ -183,9 +183,19 @@ fn handle_wkt(input_str: String, simplification: f64, is_area: bool) -> Vec<Grid
         .collect()
 }
 
-fn handle_polyline(input_str: String, precision: u32) -> Vec<GridGeom<f64>> {
+fn handle_polyline(
+    input_str: String,
+    precision: Option<u32>,
+    simplification: f64,
+) -> Vec<GridGeom<f64>> {
+    let precision = precision.expect("Precision has to be defined for polyline format");
     let lines = decode_polyline(&input_str, precision).unwrap();
-    lines.lines().map(GridGeom::Line).collect()
+    lines
+        .lines()
+        .flat_map(|line| {
+            GridGeom::vec_from_geom(geo_types::Geometry::Line(line), simplification, false)
+        })
+        .collect()
 }
 
 fn main() {
@@ -202,7 +212,7 @@ fn main() {
             .long("format")
             .value_name("FORMAT")
             .help("Input file format (tries to infer from file extension by default)")
-            .possible_values(&["geojson", "topojson", "csv", "shp"])
+            .possible_values(&["geojson", "topojson", "csv", "shp", "polyline"])
             .default_value_if("INPUT", Some("-"), "geojson")
             .takes_value(true))
         .arg(Arg::with_name("lon")
@@ -238,8 +248,8 @@ fn main() {
         .arg(Arg::with_name("precision")
             .long("precision")
             .help("Precision value for polyline parsing")
-            .takes_value(true)
-            .default_value(&"3"))
+            .required_if("format", "polyline")
+            .takes_value(true))
         .arg(Arg::with_name("area")
             .short("a")
             .long("area")
@@ -260,11 +270,14 @@ fn main() {
     let simplify = get_simplification(matches.value_of("simplify").unwrap());
     let simplification = simplify / (height * width);
 
-    let precision: u32 = match matches.value_of("precision") {
-        Some(ref precision) => precision
-            .parse()
-            .expect("Precision cannot be parsed as a number."),
-        None => 3 as u32,
+    let precision: Option<u32> = match matches.value_of("precision") {
+        Some(ref precision) => {
+            let precision = precision
+                .parse()
+                .expect("Precision cannot be parsed as a number.");
+            Some(precision)
+        }
+        None => None,
     };
 
     let spinner = ProgressBar::new_spinner();
@@ -306,6 +319,7 @@ fn main() {
         InputFormat::Polyline => handle_polyline(
             read_input_to_string(matches.value_of("INPUT").unwrap()),
             precision,
+            simplification,
         ),
     };
 
@@ -383,9 +397,9 @@ mod test {
 
     #[test]
     fn test_handle_polyline() {
-        let input_str = include_str!("../fixtures/input.polyline").to_string();
+        let input_str = include_str!("../fixtures/input.polyline.txt").to_string();
         assert_eq!(
-            handle_polyline(input_str, 5),
+            handle_polyline(input_str, Some(5), 0.),
             vec![
                 GridGeom::Line(Line::new((-120.2, 38.5), (-120.95, 40.7))),
                 GridGeom::Line(Line::new((-120.95, 40.7), (-126.453, 43.252)))
