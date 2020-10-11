@@ -24,6 +24,7 @@ csv = "1.1"
 shapefile = { version = "0.2", features = ["geo-types"] }
 topojson = "0.2.0"
 float-cmp = "0.8.0"
+wkt = "0.6.0"
 
 [[bin]]
 name = "echomap"

@@ -10,6 +10,7 @@ use geojson::{self, GeoJson};
 use indicatif::ProgressBar;
 use rstar::RTree;
 use topojson::{to_geojson, TopoJson};
+use wkt::{conversion::try_into_geometry, Wkt};
 
 mod map_grid;
 use map_grid::{GridGeom, MapGrid};
@@ -20,6 +21,7 @@ enum InputFormat {
     TopoJson,
     Csv,
     Shapefile,
+    Wkt,
 }
 
 impl FromStr for InputFormat {
@@ -31,6 +33,7 @@ impl FromStr for InputFormat {
             "topojson" => Ok(InputFormat::TopoJson),
             "csv" => Ok(InputFormat::Csv),
             "shp" => Ok(InputFormat::Shapefile),
+            "wkt" => Ok(InputFormat::Wkt),
             _ => Err(()),
         }
     }
@@ -168,6 +171,15 @@ fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Vec<GridGe
         .collect()
 }
 
+fn handle_wkt(input_str: String, simplification: f64, is_area: bool) -> Vec<GridGeom<f64>> {
+    let wkt = Wkt::<f64>::from_str(&input_str).expect("There was an error opening the wkt");
+    wkt.items
+        .into_iter()
+        .filter_map(|s| try_into_geometry(&s).ok())
+        .flat_map(|geo| GridGeom::<f64>::vec_from_geom(geo, simplification, is_area))
+        .collect()
+}
+
 fn main() {
     let matches = App::new("echomap")
         .version("0.4.0")
@@ -266,6 +278,11 @@ fn main() {
             simplification,
             matches.is_present("area"),
         ),
+        InputFormat::Wkt => handle_wkt(
+            read_input_to_string(matches.value_of("INPUT").unwrap()),
+            simplification,
+            matches.is_present("area"),
+        ),
     };
 
     // Create a combined LineString for bounds calculation
@@ -279,7 +296,7 @@ fn main() {
 #[cfg(test)]
 mod test {
     use super::*;
-    use geo_types::Point;
+    use geo_types::{Line, Point};
 
     #[test]
     fn test_get_file_format() {
@@ -324,6 +341,18 @@ mod test {
             vec![
                 GridGeom::Point(Point::<f64>::new(-1.0, 1.0)),
                 GridGeom::Point(Point::<f64>::new(-2.0, 2.0))
+            ]
+        );
+    }
+
+    #[test]
+    fn test_handle_wkt() {
+        let input_str = include_str!("../fixtures/input.wkt").to_string();
+        assert_eq!(
+            handle_wkt(input_str, 0., false),
+            vec![
+                GridGeom::Point(Point::<f64>::new(4.0, 6.0)),
+                GridGeom::Line(Line::<f64>::new((4.0, 6.0), (7.0, 10.0))),
             ]
         );
     }
