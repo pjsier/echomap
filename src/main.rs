@@ -171,22 +171,12 @@ fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Vec<GridGe
         .collect()
 }
 
-fn handle_wkt(input_str: String) -> Vec<GridGeom<f64>> {
-    let wkt = Wkt::<f64>::from_str(&input_str).expect("");
+fn handle_wkt(input_str: String, simplification: f64, is_area: bool) -> Vec<GridGeom<f64>> {
+    let wkt = Wkt::<f64>::from_str(&input_str).expect("There was an error opening the wkt");
     wkt.items
         .into_iter()
         .filter_map(|s| try_into_geometry(&s).ok())
-        .flat_map(|geo| {
-            // I'm supposing that GeometryCollection cannot be recursive
-            if let Geometry::GeometryCollection(c) = geo {
-                return c.0;
-            }
-            vec![geo]
-        })
-        .flat_map(|geo| {
-            let is_area = matches!(geo, Geometry::Polygon(_) | Geometry::MultiPolygon(_));
-            GridGeom::<f64>::vec_from_geom(geo, 0.0, is_area)
-        })
+        .flat_map(|geo| GridGeom::<f64>::vec_from_geom(geo, simplification, is_area))
         .collect()
 }
 
@@ -288,7 +278,11 @@ fn main() {
             simplification,
             matches.is_present("area"),
         ),
-        InputFormat::Wkt => handle_wkt(read_input_to_string(matches.value_of("INPUT").unwrap())),
+        InputFormat::Wkt => handle_wkt(
+            read_input_to_string(matches.value_of("INPUT").unwrap()),
+            simplification,
+            matches.is_present("area"),
+        ),
     };
 
     // Create a combined LineString for bounds calculation
@@ -355,7 +349,7 @@ mod test {
     fn test_handle_wkt() {
         let input_str = include_str!("../fixtures/input.wkt").to_string();
         assert_eq!(
-            handle_wkt(input_str),
+            handle_wkt(input_str, 0., false),
             vec![
                 GridGeom::Point(Point::<f64>::new(4.0, 6.0)),
                 GridGeom::Line(Line::<f64>::new((4.0, 6.0), (7.0, 10.0))),
