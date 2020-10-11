@@ -38,3 +38,7 @@ OPTIONS:
 ARGS:
     <INPUT>    File to parse or '-' to read stdin
 ```
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md)
