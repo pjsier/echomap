@@ -183,19 +183,16 @@ fn handle_wkt(input_str: String, simplification: f64, is_area: bool) -> Vec<Grid
         .collect()
 }
 
-fn handle_polyline(
-    input_str: String,
-    precision: Option<u32>,
-    simplification: f64,
-) -> Vec<GridGeom<f64>> {
-    let precision = precision.expect("Precision has to be defined for polyline format");
+fn handle_polyline(input_str: String, precision: &str, simplification: f64) -> Vec<GridGeom<f64>> {
+    let precision: u32 = precision
+        .parse()
+        .expect("Precision has to be defined for polyline format");
     let lines = decode_polyline(&input_str, precision).unwrap();
-    lines
-        .lines()
-        .flat_map(|line| {
-            GridGeom::vec_from_geom(geo_types::Geometry::Line(line), simplification, false)
-        })
-        .collect()
+    GridGeom::vec_from_geom(
+        geo_types::Geometry::LineString(lines),
+        simplification,
+        false,
+    )
 }
 
 fn main() {
@@ -270,16 +267,6 @@ fn main() {
     let simplify = get_simplification(matches.value_of("simplify").unwrap());
     let simplification = simplify / (height * width);
 
-    let precision: Option<u32> = match matches.value_of("precision") {
-        Some(ref precision) => {
-            let precision = precision
-                .parse()
-                .expect("Precision cannot be parsed as a number.");
-            Some(precision)
-        }
-        None => None,
-    };
-
     let spinner = ProgressBar::new_spinner();
     spinner.set_message("Reading file");
     spinner.enable_steady_tick(1);
@@ -318,7 +305,7 @@ fn main() {
         ),
         InputFormat::Polyline => handle_polyline(
             read_input_to_string(matches.value_of("INPUT").unwrap()),
-            precision,
+            matches.value_of("precision").unwrap(),
             simplification,
         ),
     };
@@ -399,7 +386,7 @@ mod test {
     fn test_handle_polyline() {
         let input_str = include_str!("../fixtures/input.polyline.txt").to_string();
         assert_eq!(
-            handle_polyline(input_str, Some(5), 0.),
+            handle_polyline(input_str, "5", 0.),
             vec![
                 GridGeom::Line(Line::new((-120.2, 38.5), (-120.95, 40.7))),
                 GridGeom::Line(Line::new((-120.95, 40.7), (-126.453, 43.252)))
