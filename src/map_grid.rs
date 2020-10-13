@@ -197,46 +197,59 @@ where
         col: i32,
         start_width: f64,
         start_height: f64,
+        cell_size: [f64; 2],
     ) -> (Point<T>, Point<T>) {
-        let cell_min_x = start_width + (self.inner_cell_size[0] * f64::from(col));
-        let cell_max_y = start_height - (self.inner_cell_size[1] * f64::from(row));
-        let cell_max_x = T::from_f64(cell_min_x + self.inner_cell_size[0]).unwrap();
-        let cell_min_y = T::from_f64(cell_max_y - self.inner_cell_size[1]).unwrap();
+        let min_x = start_width + (cell_size[0] * f64::from(col));
+        let max_y = start_height - (cell_size[1] * f64::from(row));
+        let max_x = T::from_f64(min_x + cell_size[0]).unwrap();
+        let min_y = T::from_f64(max_y - cell_size[1]).unwrap();
 
-        let min_pt = Point::new(T::from_f64(cell_min_x).unwrap(), cell_min_y);
-        let max_pt = Point::new(cell_max_x, T::from_f64(cell_max_y).unwrap());
+        let min_pt = Point::new(T::from_f64(min_x).unwrap(), min_y);
+        let max_pt = Point::new(max_x, T::from_f64(max_y).unwrap());
         (min_pt, max_pt)
     }
 
-    /// For a given Braille 2x4 cell, query which cells have lines in them
+    // Determine whether any geometries within a cell intersect
+    fn cell_intersects(&self, min_pt: Point<T>, max_pt: Point<T>) -> bool {
+        let envelope = AABB::from_corners([min_pt.x(), min_pt.y()], [max_pt.x(), max_pt.y()]);
+        let poly_bounds = Polygon::from(Rect::new(min_pt, max_pt));
+
+        self.rtree
+            .locate_in_envelope_intersecting(&envelope)
+            .skip_while(|g| match g {
+                GridGeom::Point(pt) => !poly_bounds.contains(pt),
+                GridGeom::Line(line) => !poly_bounds.intersects(line),
+                GridGeom::Polygon(poly) => !poly_bounds.intersects(poly),
+            })
+            .take(1)
+            .next()
+            .is_some()
+    }
+
+    /// For a given Braille 2x4 cell, query which cells have geometries in them
     fn query_cell_value(&self, row: i32, col: i32) -> u32 {
         let mut cell_value = 0x00;
 
+        let bbox_min_x = self.bbox.min.x.to_f64().unwrap();
+        let bbox_max_y = self.bbox.max.y.to_f64().unwrap();
+
+        // Return early if there are no geometries in the outer cell
+        let (outer_min_pt, outer_max_pt) =
+            self.min_max_points(row, col, bbox_min_x, bbox_max_y, self.cell_size);
+        if !self.cell_intersects(outer_min_pt, outer_max_pt) {
+            return cell_value;
+        }
+
         // Get the start offset dimensions based on the outer row and column
-        let start_width = (self.cell_size[0] * f64::from(col)) + self.bbox.min.x.to_f64().unwrap();
-        let start_height = self.bbox.max.y.to_f64().unwrap() - (self.cell_size[1] * f64::from(row));
+        let start_width = (self.cell_size[0] * f64::from(col)) + bbox_min_x;
+        let start_height = bbox_max_y - (self.cell_size[1] * f64::from(row));
 
         for r in 0..CELL_ROWS {
             for c in 0..CELL_COLS {
-                let (min_pt, max_pt) = self.min_max_points(r, c, start_width, start_height);
-                let envelope =
-                    AABB::from_corners([min_pt.x(), min_pt.y()], [max_pt.x(), max_pt.y()]);
-
-                // Find all intersecting envelopes, check if the underlying lines intersect
-                let poly_bounds = Polygon::from(Rect::new(min_pt, max_pt));
-                let intersecting_geoms: Vec<&GridGeom<T>> = self
-                    .rtree
-                    .locate_in_envelope_intersecting(&envelope)
-                    .skip_while(|l| match l {
-                        GridGeom::Point(pt) => !poly_bounds.contains(pt),
-                        GridGeom::Line(line) => !poly_bounds.intersects(line),
-                        GridGeom::Polygon(poly) => !poly_bounds.intersects(poly),
-                    })
-                    .take(1)
-                    .collect();
-
+                let (min_pt, max_pt) =
+                    self.min_max_points(r, c, start_width, start_height, self.inner_cell_size);
                 // Add the associated cell value if intersecting lines are found
-                if !intersecting_geoms.is_empty() {
+                if self.cell_intersects(min_pt, max_pt) {
                     cell_value += braille_cell_value(r, c);
                 }
             }
@@ -301,11 +314,11 @@ mod test {
         let start_width = (grid.cell_size[0] * f64::from(col)) + grid.bbox.min.x.to_f64().unwrap();
         let start_height = grid.bbox.max.y.to_f64().unwrap() - (grid.cell_size[1] * f64::from(row));
         assert_eq!(
-            grid.min_max_points(0, 0, start_width, start_height),
+            grid.min_max_points(0, 0, start_width, start_height, grid.inner_cell_size),
             (Point::<f64>::new(0., 0.5,), Point::<f64>::new(0.5, 1.))
         );
         assert_eq!(
-            grid.min_max_points(4, 1, start_width, start_height),
+            grid.min_max_points(4, 1, start_width, start_height, grid.inner_cell_size),
             (Point::<f64>::new(0.5, -1.5), Point::<f64>::new(1.0, -1.))
         );
     }
