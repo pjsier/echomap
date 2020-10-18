@@ -17,6 +17,7 @@ geo-types = { version = "0.4", features = ["rstar"] }
 geojson = { version = "0.16", features = ["geo-types"] }
 num-traits = "0.2"
 rstar = "0.5"
+anyhow = "1.0"
 console = "0.12.0"
 indicatif = "0.15.0"
 clap = "2.33.3"

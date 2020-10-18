@@ -3,6 +3,7 @@ use std::fs;
 use std::io::{self, Read};
 use std::str::FromStr;
 
+use anyhow::{self, Context, Result};
 use clap::{App, Arg};
 use console::Term;
 use geo_types::{Geometry, Point};
@@ -27,9 +28,9 @@ enum InputFormat {
 }
 
 impl FromStr for InputFormat {
-    type Err = ();
+    type Err = anyhow::Error;
 
-    fn from_str(s: &str) -> Result<InputFormat, ()> {
+    fn from_str(s: &str) -> Result<InputFormat> {
         match s.to_ascii_lowercase().as_ref() {
             "geojson" => Ok(InputFormat::GeoJson),
             "topojson" => Ok(InputFormat::TopoJson),
@@ -37,46 +38,48 @@ impl FromStr for InputFormat {
             "shp" => Ok(InputFormat::Shapefile),
             "wkt" => Ok(InputFormat::Wkt),
             "polyline" => Ok(InputFormat::Polyline),
-            _ => Err(()),
+            f => Err(anyhow::anyhow!("Invalid format supplied: {}", f)),
         }
     }
 }
 
 /// Get file format from flag or infer from file path
-fn get_file_format(file_path: &str, file_format: Option<&str>) -> InputFormat {
+fn get_file_format(file_path: &str, file_format: Option<&str>) -> Result<InputFormat> {
     let format_str = match file_format {
         Some(f) => f,
         None => file_path.split('.').last().unwrap(),
     };
-    format_str.parse().expect("Invalid format supplied")
+    format_str.parse()
 }
 
 /// Parse simplification value from float or percentage string
-fn get_simplification(simplify: &str) -> f64 {
+fn get_simplification(simplify: &str) -> Result<f64> {
     if simplify.contains('%') {
-        simplify.replace("%", "").parse::<f64>().unwrap() / 100.
+        let simplify = simplify
+            .replace("%", "")
+            .parse::<f64>()
+            .with_context(|| format!("Could not parse simplify value: {}", simplify))?;
+        Ok(simplify / 100.)
     } else {
-        simplify.parse::<f64>().unwrap()
+        simplify
+            .parse::<f64>()
+            .with_context(|| format!("Could not parse simplify value: {}", simplify))
     }
 }
 
 /// Read file path (or stdin) to string
-fn read_input_to_string(file_path: &str) -> String {
+fn read_input_to_string(file_path: &str) -> Result<String> {
     let mut input_str = String::new();
     match file_path {
-        "-" => {
-            io::stdin()
-                .read_to_string(&mut input_str)
-                .expect("There was an error reading from stdin");
-        }
-        _ => {
-            fs::File::open(file_path)
-                .unwrap()
-                .read_to_string(&mut input_str)
-                .expect("There was an error reading your file");
-        }
-    };
-    input_str
+        "-" => io::stdin()
+            .read_to_string(&mut input_str)
+            .context("There was an error reading from stdin"),
+        _ => fs::File::open(file_path)
+            .unwrap()
+            .read_to_string(&mut input_str)
+            .with_context(|| format!("There was an error reading from file: {}", file_path)),
+    }?;
+    Ok(input_str)
 }
 
 /// Process top-level GeoJSON items
@@ -106,33 +109,41 @@ pub fn process_geojson(gj: GeoJson, simplification: f64, is_area: bool) -> Vec<G
     }
 }
 
-fn handle_geojson(input_str: String, simplification: f64, is_area: bool) -> Vec<GridGeom<f64>> {
+fn handle_geojson(
+    input_str: String,
+    simplification: f64,
+    is_area: bool,
+) -> Result<Vec<GridGeom<f64>>> {
     let gj: GeoJson = input_str
         .parse::<GeoJson>()
-        .expect("Unable to parse GeoJSON");
-    process_geojson(gj, simplification, is_area)
+        .context("Unable to parse GeoJSON")?;
+    Ok(process_geojson(gj, simplification, is_area))
 }
 
-fn handle_topojson(input_str: String, simplification: f64, is_area: bool) -> Vec<GridGeom<f64>> {
+fn handle_topojson(
+    input_str: String,
+    simplification: f64,
+    is_area: bool,
+) -> Result<Vec<GridGeom<f64>>> {
     let topo = input_str
         .parse::<TopoJson>()
         .expect("Unable to parse TopoJSON");
     match topo {
-        TopoJson::Topology(t) => t
+        TopoJson::Topology(t) => Ok(t
             .list_names()
             .into_iter()
             .map(|n| to_geojson(&t, &n))
             .filter_map(|g| g.ok())
             .map(GeoJson::FeatureCollection)
             .flat_map(|g| process_geojson(g, simplification, is_area))
-            .collect(),
+            .collect()),
         _ => unimplemented!(),
     }
 }
 
-fn handle_csv(input_str: String, lat_col: &str, lon_col: &str) -> Vec<GridGeom<f64>> {
+fn handle_csv(input_str: String, lat_col: &str, lon_col: &str) -> Result<Vec<GridGeom<f64>>> {
     let mut rdr = csv::Reader::from_reader(input_str.as_bytes());
-    let headers = rdr.headers().expect("Unable to load CSV headers");
+    let headers = rdr.headers().context("Unable to load CSV headers")?;
 
     let lat_idx = headers
         .iter()
@@ -143,7 +154,8 @@ fn handle_csv(input_str: String, lat_col: &str, lon_col: &str) -> Vec<GridGeom<f
         .position(|v| v == lon_col)
         .expect("Lon column not found");
 
-    rdr.records()
+    Ok(rdr
+        .records()
         .map(|rec_val| {
             let rec = rec_val.unwrap();
             let lat_val: f64 = rec
@@ -159,43 +171,50 @@ fn handle_csv(input_str: String, lat_col: &str, lon_col: &str) -> Vec<GridGeom<f
             let pt: Point<f64> = Point::new(lon_val, lat_val);
             GridGeom::Point(pt)
         })
-        .collect()
+        .collect())
 }
 
-fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Vec<GridGeom<f64>> {
-    let rdr =
-        shapefile::Reader::from_path(file_path).expect("There was an error opening the shapefile");
-    rdr.iter_shapes()
+fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Result<Vec<GridGeom<f64>>> {
+    let rdr = shapefile::Reader::from_path(file_path)
+        .with_context(|| format!("There was an error opening shapefile {}", file_path))?;
+    Ok(rdr
+        .iter_shapes()
         .filter_map(|s| s.ok())
         .flat_map(|s| match Geometry::<f64>::try_from(s) {
             Ok(geom) => GridGeom::<f64>::vec_from_geom(geom, simplification, is_area),
             Err(_) => vec![],
         })
-        .collect()
+        .collect())
 }
 
-fn handle_wkt(input_str: String, simplification: f64, is_area: bool) -> Vec<GridGeom<f64>> {
-    let wkt = Wkt::<f64>::from_str(&input_str).expect("There was an error opening the wkt");
-    wkt.items
+fn handle_wkt(input_str: String, simplification: f64, is_area: bool) -> Result<Vec<GridGeom<f64>>> {
+    let wkt = Wkt::<f64>::from_str(&input_str)
+        .map_err(|_| anyhow::anyhow!("There was an error parsing WKT"))?;
+    Ok(wkt
+        .items
         .into_iter()
         .filter_map(|s| try_into_geometry(&s).ok())
         .flat_map(|geo| GridGeom::<f64>::vec_from_geom(geo, simplification, is_area))
-        .collect()
+        .collect())
 }
 
-fn handle_polyline(input_str: String, precision: &str, simplification: f64) -> Vec<GridGeom<f64>> {
+fn handle_polyline(
+    input_str: String,
+    precision: &str,
+    simplification: f64,
+) -> Result<Vec<GridGeom<f64>>> {
     let precision: u32 = precision
         .parse()
-        .expect("Precision has to be defined for polyline format");
+        .context("Precision has to be defined for polyline format")?;
     let lines = decode_polyline(&input_str, precision).unwrap();
-    GridGeom::vec_from_geom(
+    Ok(GridGeom::vec_from_geom(
         geo_types::Geometry::LineString(lines),
         simplification,
         false,
-    )
+    ))
 }
 
-fn main() {
+fn main() -> Result<()> {
     let matches = App::new("echomap")
         .version("0.4.0")
         .about("Preview map files in the terminal")
@@ -264,7 +283,7 @@ fn main() {
     };
 
     // Simplification is scaled by the output size
-    let simplify = get_simplification(matches.value_of("simplify").unwrap());
+    let simplify = get_simplification(matches.value_of("simplify").unwrap())?;
     let simplification = simplify / (height * width);
 
     let spinner = ProgressBar::new_spinner();
@@ -275,21 +294,21 @@ fn main() {
     let file_format = get_file_format(
         matches.value_of("INPUT").unwrap(),
         matches.value_of("format"),
-    );
+    )?;
 
     let geoms: Vec<GridGeom<f64>> = match file_format {
         InputFormat::GeoJson => handle_geojson(
-            read_input_to_string(matches.value_of("INPUT").unwrap()),
+            read_input_to_string(matches.value_of("INPUT").unwrap())?,
             simplification,
             matches.is_present("area"),
         ),
         InputFormat::TopoJson => handle_topojson(
-            read_input_to_string(matches.value_of("INPUT").unwrap()),
+            read_input_to_string(matches.value_of("INPUT").unwrap())?,
             simplification,
             matches.is_present("area"),
         ),
         InputFormat::Csv => handle_csv(
-            read_input_to_string(matches.value_of("INPUT").unwrap()),
+            read_input_to_string(matches.value_of("INPUT").unwrap())?,
             matches.value_of("lat").unwrap(),
             matches.value_of("lon").unwrap(),
         ),
@@ -299,16 +318,16 @@ fn main() {
             matches.is_present("area"),
         ),
         InputFormat::Wkt => handle_wkt(
-            read_input_to_string(matches.value_of("INPUT").unwrap()),
+            read_input_to_string(matches.value_of("INPUT").unwrap())?,
             simplification,
             matches.is_present("area"),
         ),
         InputFormat::Polyline => handle_polyline(
-            read_input_to_string(matches.value_of("INPUT").unwrap()),
+            read_input_to_string(matches.value_of("INPUT").unwrap())?,
             matches.value_of("precision").unwrap(),
             simplification,
         ),
-    };
+    }?;
 
     // Create a combined LineString for bounds calculation
     spinner.set_message("Indexing geography");
@@ -316,6 +335,8 @@ fn main() {
     let grid = MapGrid::new(width, height, rtree);
     spinner.finish_and_clear();
     grid.print();
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -325,19 +346,22 @@ mod test {
 
     #[test]
     fn test_get_file_format() {
-        assert_eq!(get_file_format("test.GEOJSON", None), InputFormat::GeoJson);
-        assert_eq!(
+        assert!(matches!(
+            get_file_format("test.GEOJSON", None),
+            Ok(InputFormat::GeoJson)
+        ));
+        assert!(matches!(
             get_file_format("test.geojson", Some("csv")),
-            InputFormat::Csv
-        );
+            Ok(InputFormat::Csv)
+        ));
     }
 
     #[test]
     fn test_handle_geojson() {
         let input_str = include_str!("../fixtures/input.geojson").to_string();
-        let outlines = handle_geojson(input_str.clone(), 0., false);
+        let outlines = handle_geojson(input_str.clone(), 0., false).unwrap();
         let lines = outlines.iter().filter(|g| matches!(g, GridGeom::Line(_)));
-        let areas = handle_geojson(input_str, 0., true);
+        let areas = handle_geojson(input_str, 0., true).unwrap();
         let poly = areas.iter().filter(|g| matches!(g, GridGeom::Polygon(_)));
         assert_eq!(outlines.len(), 14);
         assert_eq!(lines.count(), 13);
@@ -348,9 +372,9 @@ mod test {
     #[test]
     fn test_handle_topojson() {
         let input_str = include_str!("../fixtures/input.topojson").to_string();
-        let outlines = handle_topojson(input_str.clone(), 0., false);
+        let outlines = handle_topojson(input_str.clone(), 0., false).unwrap();
         let lines = outlines.iter().filter(|g| matches!(g, GridGeom::Line(_)));
-        let areas = handle_topojson(input_str, 0., true);
+        let areas = handle_topojson(input_str, 0., true).unwrap();
         let poly = areas.iter().filter(|g| matches!(g, GridGeom::Polygon(_)));
         assert_eq!(outlines.len(), 14);
         assert_eq!(lines.count(), 13);
@@ -362,7 +386,7 @@ mod test {
     fn test_handle_csv() {
         let input_str = include_str!("../fixtures/input.csv").to_string();
         assert_eq!(
-            handle_csv(input_str, "one", "two"),
+            handle_csv(input_str, "one", "two").unwrap(),
             vec![
                 GridGeom::Point(Point::<f64>::new(-1.0, 1.0)),
                 GridGeom::Point(Point::<f64>::new(-2.0, 2.0))
@@ -374,7 +398,7 @@ mod test {
     fn test_handle_wkt() {
         let input_str = include_str!("../fixtures/input.wkt").to_string();
         assert_eq!(
-            handle_wkt(input_str, 0., false),
+            handle_wkt(input_str, 0., false).unwrap(),
             vec![
                 GridGeom::Point(Point::<f64>::new(4.0, 6.0)),
                 GridGeom::Line(Line::<f64>::new((4.0, 6.0), (7.0, 10.0))),
@@ -386,7 +410,7 @@ mod test {
     fn test_handle_polyline() {
         let input_str = include_str!("../fixtures/input.polyline.txt").to_string();
         assert_eq!(
-            handle_polyline(input_str, "5", 0.),
+            handle_polyline(input_str, "5", 0.).unwrap(),
             vec![
                 GridGeom::Line(Line::new((-120.2, 38.5), (-120.95, 40.7))),
                 GridGeom::Line(Line::new((-120.95, 40.7), (-126.453, 43.252)))
