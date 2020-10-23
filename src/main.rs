@@ -6,7 +6,7 @@ use std::str::FromStr;
 use anyhow::{self, Context, Result};
 use clap::{App, Arg};
 use console::Term;
-use geo_types::{Geometry, Point};
+use geo::{Geometry, Point};
 use geojson::{self, GeoJson};
 use indicatif::ProgressBar;
 use polyline::decode_polyline;

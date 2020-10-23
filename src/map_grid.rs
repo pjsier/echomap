@@ -5,15 +5,14 @@ use geo::algorithm::bounding_rect::BoundingRect;
 use geo::algorithm::contains::Contains;
 use geo::algorithm::intersects::Intersects;
 use geo::algorithm::simplifyvw::SimplifyVW;
-use geo_types::Geometry;
-use geo_types::{CoordinateType, Line, Point, Polygon, Rect};
+use geo::{CoordinateType, Geometry, Line, Point, Polygon, Rect};
 use num_traits::{Float, FromPrimitive};
 use rstar::{self, RTree, RTreeNum, RTreeObject, AABB};
 
 const CELL_ROWS: i32 = 4;
 const CELL_COLS: i32 = 2;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum GridGeom<T>
 where
     T: CoordinateType + Float + RTreeNum + FromPrimitive,
@@ -30,9 +29,9 @@ where
     /// Simplify geometries into component pieces for GridGeom
     pub fn vec_from_geom(geom: Geometry<T>, simplification: T, is_area: bool) -> Vec<GridGeom<T>> {
         match geom {
-            Geometry::Point(s) => vec![GridGeom::Point(s)],
+            Geometry::Point(s) => vec![GridGeom::Point(s); 1],
             Geometry::MultiPoint(s) => s.into_iter().map(GridGeom::Point).collect(),
-            Geometry::Line(s) => vec![GridGeom::Line(s)],
+            Geometry::Line(s) => vec![GridGeom::Line(s); 1],
             Geometry::LineString(s) => s
                 .simplifyvw(&simplification)
                 .lines()
@@ -46,7 +45,7 @@ where
                 .collect(),
             Geometry::Polygon(s) => {
                 if is_area {
-                    vec![GridGeom::Polygon(s.simplifyvw(&simplification))]
+                    vec![GridGeom::Polygon(s.simplifyvw(&simplification)); 1]
                 } else {
                     s.simplifyvw(&simplification)
                         .exterior()
@@ -69,6 +68,8 @@ where
                         .collect()
                 }
             }
+            Geometry::Triangle(s) => vec![GridGeom::Polygon(s.to_polygon()); 1],
+            Geometry::Rect(s) => vec![GridGeom::Polygon(s.to_polygon()); 1],
             Geometry::GeometryCollection(s) => s
                 .into_iter()
                 .flat_map(|g| GridGeom::<T>::vec_from_geom(g, simplification, is_area))
@@ -88,11 +89,11 @@ where
             GridGeom::Point(pt) => AABB::from_point([pt.x(), pt.y()]),
             GridGeom::Line(line) => {
                 let bb = line.bounding_rect();
-                AABB::from_corners([bb.min.x, bb.min.y], [bb.max.x, bb.max.y])
+                AABB::from_corners([bb.min().x, bb.min().y], [bb.max().x, bb.max().y])
             }
             GridGeom::Polygon(poly) => {
                 let bb = poly.bounding_rect().unwrap();
-                AABB::from_corners([bb.min.x, bb.min.y], [bb.max.x, bb.max.y])
+                AABB::from_corners([bb.min().x, bb.min().y], [bb.max().x, bb.max().y])
             }
         }
     }
@@ -230,8 +231,8 @@ where
     fn query_cell_value(&self, row: i32, col: i32) -> u32 {
         let mut cell_value = 0x00;
 
-        let bbox_min_x = self.bbox.min.x.to_f64().unwrap();
-        let bbox_max_y = self.bbox.max.y.to_f64().unwrap();
+        let bbox_min_x = self.bbox.min().x.to_f64().unwrap();
+        let bbox_max_y = self.bbox.max().y.to_f64().unwrap();
 
         // Return early if there are no geometries in the outer cell
         let (outer_min_pt, outer_max_pt) =
@@ -311,8 +312,10 @@ mod test {
         ]);
         let grid = MapGrid::new(4., 4., rtree);
         let (row, col) = (0, 0);
-        let start_width = (grid.cell_size[0] * f64::from(col)) + grid.bbox.min.x.to_f64().unwrap();
-        let start_height = grid.bbox.max.y.to_f64().unwrap() - (grid.cell_size[1] * f64::from(row));
+        let start_width =
+            (grid.cell_size[0] * f64::from(col)) + grid.bbox.min().x.to_f64().unwrap();
+        let start_height =
+            grid.bbox.max().y.to_f64().unwrap() - (grid.cell_size[1] * f64::from(row));
         assert_eq!(
             grid.min_max_points(0, 0, start_width, start_height, grid.inner_cell_size),
             (Point::<f64>::new(0., 0.5,), Point::<f64>::new(0.5, 1.))
