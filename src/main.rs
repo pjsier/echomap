@@ -127,7 +127,7 @@ fn handle_topojson(
 ) -> Result<Vec<GridGeom<f64>>> {
     let topo = input_str
         .parse::<TopoJson>()
-        .expect("Unable to parse TopoJSON");
+        .context("Unable to parse TopoJSON")?;
     match topo {
         TopoJson::Topology(t) => Ok(t
             .list_names()
@@ -148,30 +148,29 @@ fn handle_csv(input_str: String, lat_col: &str, lon_col: &str) -> Result<Vec<Gri
     let lat_idx = headers
         .iter()
         .position(|v| v == lat_col)
-        .expect("Lat column not found");
+        .with_context(|| format!("Lat column {} not found", lat_col))?;
     let lon_idx = headers
         .iter()
         .position(|v| v == lon_col)
-        .expect("Lon column not found");
+        .with_context(|| format!("Lon column {} not found", lat_col))?;
 
-    Ok(rdr
-        .records()
+    rdr.records()
         .map(|rec_val| {
-            let rec = rec_val.unwrap();
+            let rec = rec_val.context("Could not parse CSV record")?;
             let lat_val: f64 = rec
                 .get(lat_idx)
                 .unwrap()
                 .parse()
-                .expect("Could not parse lat value from record");
+                .context("Could not parse lat value from record")?;
             let lon_val: f64 = rec
                 .get(lon_idx)
                 .unwrap()
                 .parse()
-                .expect("Could not parse lon value from record");
+                .context("Could not parse lon value from record")?;
             let pt: Point<f64> = Point::new(lon_val, lat_val);
-            GridGeom::Point(pt)
+            Ok(GridGeom::Point(pt))
         })
-        .collect())
+        .collect()
 }
 
 fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Result<Vec<GridGeom<f64>>> {
@@ -274,13 +273,17 @@ fn main() -> Result<()> {
 
     let (term_height, term_width) = Term::stdout().size();
     let height: f64 = match matches.value_of("rows") {
-        Some(ref rows) => rows.parse().expect("Rows cannot be parsed as a number."),
-        None => f64::from(term_height - 1),
-    };
+        Some(ref rows) => rows
+            .parse()
+            .with_context(|| format!("Rows value {} cannot be parsed as a number", rows)),
+        None => Ok(f64::from(term_height - 1)),
+    }?;
     let width: f64 = match matches.value_of("columns") {
-        Some(ref cols) => cols.parse().expect("Columns cannot be parsed as a number."),
-        None => f64::from(term_width),
-    };
+        Some(ref cols) => cols
+            .parse()
+            .with_context(|| format!("Columns value {} cannot be parsed as a number", cols)),
+        None => Ok(f64::from(term_width)),
+    }?;
 
     // Simplification is scaled by the output size
     let simplify = get_simplification(matches.value_of("simplify").unwrap())?;
@@ -334,9 +337,7 @@ fn main() -> Result<()> {
     let rtree: RTree<GridGeom<f64>> = RTree::bulk_load(geoms);
     let grid = MapGrid::new(width, height, rtree);
     spinner.finish_and_clear();
-    grid.print();
-
-    Ok(())
+    grid.print()
 }
 
 #[cfg(test)]

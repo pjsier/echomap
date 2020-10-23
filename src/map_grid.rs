@@ -1,6 +1,7 @@
 use std::char;
 use std::io::{self, Write};
 
+use anyhow::{Context, Result};
 use geo::algorithm::bounding_rect::BoundingRect;
 use geo::algorithm::contains::Contains;
 use geo::algorithm::intersects::Intersects;
@@ -177,7 +178,7 @@ where
     }
 
     /// Iterate through cells, printing one line at a time
-    pub fn print(&self) {
+    pub fn print(&self) -> Result<()> {
         let stdout = io::stdout();
         let mut handle = io::BufWriter::new(stdout.lock());
 
@@ -187,8 +188,9 @@ where
                 let cell_value = self.query_cell_value(r, c);
                 row_str.push_str(&braille_char(cell_value).to_string());
             }
-            writeln!(handle, "{}", row_str).expect("Error printing line");
+            writeln!(handle, "{}", row_str).context("Error printing line")?;
         }
+        Ok(())
     }
 
     // Get the minimum and maximum points of a cell
