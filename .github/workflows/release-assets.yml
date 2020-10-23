@@ -1,0 +1,54 @@
+name: Release assets
+
+on:
+  release:
+    types:
+      - created
+
+jobs:
+  publish_release_assets:
+    name: Publish release assets for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            artifact_name: echomap
+            asset_name: echomap-linux-amd64
+            asset_content_type: application/octet-stream
+
+          - os: windows-latest
+            artifact_name: echomap.exe
+            asset_name: echomap-windows-amd64
+            asset_content_type: application/vnd.microsoft.portable-executable
+
+          - os: macos-latest
+            artifact_name: echomap
+            asset_name: echomap-macos-amd64
+            asset_content_type: application/octet-stream
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --release --locked
+
+      - name: Upload binaries to release
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./target/release/${{ matrix.artifact_name }}
+          asset_name: ${{ matrix.asset_name }}
+          asset_content_type: ${{ matrix.asset_content_type }}
