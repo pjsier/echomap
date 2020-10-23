@@ -20,7 +20,7 @@ jobs:
 
           - os: windows-latest
             artifact_name: echomap.exe
-            asset_name: echomap-windows-amd64
+            asset_name: echomap-windows-amd64.exe
             asset_content_type: application/vnd.microsoft.portable-executable
 
           - os: macos-latest
