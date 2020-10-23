@@ -214,10 +214,10 @@ fn handle_polyline(
 }
 
 fn main() -> Result<()> {
-    let matches = App::new("echomap")
-        .version("0.4.0")
-        .about("Preview map files in the terminal")
-        .author("Pat Sier <pjsier@gmail.com>")
+    let matches = App::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
+        .about(env!("CARGO_PKG_DESCRIPTION"))
+        .author(env!("CARGO_PKG_AUTHORS"))
         .arg(Arg::with_name("INPUT")
             .help("File to parse or '-' to read stdin")
             .required(true)
