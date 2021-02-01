@@ -9,6 +9,7 @@ use console::Term;
 use geo::{Geometry, Point};
 use geojson::{self, GeoJson};
 use indicatif::ProgressBar;
+use kml::{quick_collection, Kml};
 use polyline::decode_polyline;
 use rstar::RTree;
 use topojson::{to_geojson, TopoJson};
@@ -25,6 +26,7 @@ enum InputFormat {
     Shapefile,
     Wkt,
     Polyline,
+    Kml,
 }
 
 impl FromStr for InputFormat {
@@ -38,6 +40,7 @@ impl FromStr for InputFormat {
             "shp" => Ok(InputFormat::Shapefile),
             "wkt" => Ok(InputFormat::Wkt),
             "polyline" => Ok(InputFormat::Polyline),
+            "kml" => Ok(InputFormat::Kml),
             f => Err(anyhow::anyhow!("Invalid format supplied: {}", f)),
         }
     }
@@ -213,11 +216,21 @@ fn handle_polyline(
     ))
 }
 
+fn handle_kml(input_str: String, simplification: f64, is_area: bool) -> Result<Vec<GridGeom<f64>>> {
+    let kml: Kml = input_str
+        .parse()
+        .map_err(|_| anyhow::anyhow!("There was an error parsing KML"))?;
+    Ok(GridGeom::<f64>::vec_from_geom(
+        geo_types::Geometry::GeometryCollection(quick_collection(kml)?),
+        simplification,
+        is_area,
+    ))
+}
+
 fn main() -> Result<()> {
     let matches = App::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
-        .author(env!("CARGO_PKG_AUTHORS"))
         .arg(Arg::with_name("INPUT")
             .help("File to parse or '-' to read stdin")
             .required(true)
@@ -227,7 +240,7 @@ fn main() -> Result<()> {
             .long("format")
             .value_name("FORMAT")
             .help("Input file format (tries to infer from file extension by default)")
-            .possible_values(&["geojson", "topojson", "csv", "shp", "wkt", "polyline"])
+            .possible_values(&["geojson", "topojson", "csv", "shp", "wkt", "polyline", "kml"])
             .default_value_if("INPUT", Some("-"), "geojson")
             .takes_value(true))
         .arg(Arg::with_name("lon")
@@ -330,6 +343,11 @@ fn main() -> Result<()> {
             matches.value_of("precision").unwrap(),
             simplification,
         ),
+        InputFormat::Kml => handle_kml(
+            read_input_to_string(matches.value_of("INPUT").unwrap())?,
+            simplification,
+            matches.is_present("area"),
+        ),
     }?;
 
     // Create a combined LineString for bounds calculation
@@ -415,6 +433,19 @@ mod test {
             vec![
                 GridGeom::Line(Line::new((-120.2, 38.5), (-120.95, 40.7))),
                 GridGeom::Line(Line::new((-120.95, 40.7), (-126.453, 43.252)))
+            ]
+        );
+    }
+
+    #[test]
+    fn test_handle_kml() {
+        let input_str = include_str!("../fixtures/input.kml").to_string();
+        assert_eq!(
+            handle_kml(input_str, 0., false).unwrap(),
+            vec![
+                GridGeom::Line(Line::new((-1., 2.), (-1.5, 3.))),
+                GridGeom::Line(Line::new((-1.5, 3.), (-1.5, 2.))),
+                GridGeom::Line(Line::new((-1.5, 2.), (-1., 2.)))
             ]
         );
     }
