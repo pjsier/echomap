@@ -23,9 +23,9 @@ checksum = "a1fd36ffbb1fb7c834eac128ea8d0e310c5aeb635548f9d58861e1308d46e71c"
 
 [[package]]
 name = "approx"
-version = "0.3.2"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0e60b75072ecd4168020818c0107f2857bb6c4e64252d8d3983f6263b40a5c3"
+checksum = "3f2a05fd1bd10b2527e20a2cd32d8873d115b8b39fe219ee25f42a8aca6ba278"
 dependencies = [
  "num-traits",
 ]
@@ -273,21 +273,22 @@ dependencies = [
 
 [[package]]
 name = "geo"
-version = "0.14.2"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "139007e3210dfc1d010e166e779059be5e0f31967a71f3edae97116aefb74450"
+checksum = "479219490dcbbf2a374908457df0b4d5b1d8eb62eb48b0ee897f9af9e7c44210"
 dependencies = [
  "geo-types",
  "geographiclib-rs",
  "num-traits",
+ "robust",
  "rstar",
 ]
 
 [[package]]
 name = "geo-types"
-version = "0.6.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd0e91cb835a9b740d38fc45efdf6392bedd20101f1e7419e464cd54f61373a1"
+checksum = "a6b362f0f09b4ff7ad8210f806f80ab6d0d895365a6830cb504267aeccfe3f43"
 dependencies = [
  "approx",
  "num-traits",
@@ -305,12 +306,11 @@ dependencies = [
 
 [[package]]
 name = "geojson"
-version = "0.20.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3914afc51d14f46ce892cd84c7d83e4b6794d61a3d355931c13551e43b87aac"
+checksum = "a510a4ab1fbcc4058e030c438838ae3bc660065009d3bc3ad2a2e4658b3d0cf3"
 dependencies = [
  "geo-types",
- "num-traits",
  "serde",
  "serde_json",
  "thiserror",
@@ -442,9 +442,9 @@ checksum = "3831453b3449ceb48b6d9c7ad7c96d5ea673e9b470a1dc578c2ce6521230884c"
 
 [[package]]
 name = "polyline"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "553a3c166aa6e9f1f7f13ba230f8a897aad1e644c2ee1a1cf6da0c53f7b036a4"
+checksum = "b4fb271c371b801041a8eaa6046cf694f84dd21817610f5ba962efd273f47779"
 dependencies = [
  "geo-types",
 ]
@@ -501,6 +501,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "26412eb97c6b088a6997e05f69403a802a92d520de2f8e63c2b65f9e0f47c4e8"
 
 [[package]]
+name = "robust"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e5864e7ef1a6b7bcf1d6ca3f655e65e724ed3b52546a0d0a663c991522f552ea"
+
+[[package]]
 name = "rstar"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -537,9 +543,9 @@ dependencies = [
 
 [[package]]
 name = "shapefile"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16f6c5c072715c155a4be5fea86779a2a188b3c3065ecf46ba3b4eb52c455fef"
+checksum = "72a37cae8a3274ff42957be5f62cdd1e4e6bc70178e096d99831d12178938d6f"
 dependencies = [
  "byteorder",
  "dbase",
@@ -636,9 +642,9 @@ dependencies = [
 
 [[package]]
 name = "topojson"
-version = "0.3.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2aff6bd958a7d20e1ac3e4981b346a326ceb70f681b4d73bad493cf4c81e86ed"
+checksum = "9d9e0f9fb0843004d5da89d4763d15a2bba575b80e4907a5bb77a30395b854eb"
 dependencies = [
  "geojson",
  "log",
@@ -716,8 +722,7 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 [[package]]
 name = "wkt"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd5f08ce23c6e6a296762b8f4d8beadeae1f58e8184226197818db8885d458e6"
+source = "git+https://github.com/georust/wkt#f049273dedf6c9be22dcc9cc2e51dd06e1d5a1da"
 dependencies = [
  "geo-types",
  "num-traits",

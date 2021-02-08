@@ -12,9 +12,9 @@ keywords = ["geo", "map", "gis", "cli"]
 exclude = [".github/*", "img/*", "fixtures/*"]
 
 [dependencies]
-geo = "0.14"
-geo-types = { version = "0.6", features = ["rstar"] }
-geojson = { version = "0.20", features = ["geo-types"] }
+geo = "0.17"
+geo-types = { version = "0.7", features = ["rstar"] }
+geojson = { version = "0.22", features = ["geo-types"] }
 num-traits = "0.2"
 rstar = "0.8"
 anyhow = "1.0"
@@ -22,11 +22,11 @@ console = "0.12"
 indicatif = "0.15"
 clap = "2.33.3"
 csv = "1.1"
-shapefile = { version = "0.2.1", features = ["geo-types"] }
-topojson = "0.3"
+shapefile = { version = "0.2.2", features = ["geo-types"] }
+topojson = "0.5"
 float-cmp = "0.8"
-wkt = "0.8"
-polyline = "0.8"
+wkt = { git = "https://github.com/georust/wkt" }
+polyline = "0.9"
 kml = "0.3"
 
 [[bin]]

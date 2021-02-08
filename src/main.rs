@@ -13,7 +13,7 @@ use kml::{quick_collection, Kml};
 use polyline::decode_polyline;
 use rstar::RTree;
 use topojson::{to_geojson, TopoJson};
-use wkt::{conversion::try_into_geometry, Wkt};
+use wkt::Wkt;
 
 mod map_grid;
 use map_grid::{GridGeom, MapGrid};
@@ -195,7 +195,7 @@ fn handle_wkt(input_str: String, simplification: f64, is_area: bool) -> Result<V
     Ok(wkt
         .items
         .into_iter()
-        .filter_map(|s| try_into_geometry(&s).ok())
+        .filter_map(|s| s.try_into().ok())
         .flat_map(|geo| GridGeom::<f64>::vec_from_geom(geo, simplification, is_area))
         .collect())
 }

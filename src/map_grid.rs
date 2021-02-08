@@ -6,8 +6,8 @@ use geo::algorithm::bounding_rect::BoundingRect;
 use geo::algorithm::contains::Contains;
 use geo::algorithm::intersects::Intersects;
 use geo::algorithm::simplifyvw::SimplifyVW;
-use geo::{CoordinateType, Geometry, Line, Point, Polygon, Rect};
-use num_traits::{Float, FromPrimitive};
+use geo::{GeoFloat, Geometry, Line, Point, Polygon, Rect};
+use num_traits::FromPrimitive;
 use rstar::{self, RTree, RTreeNum, RTreeObject, AABB};
 
 const CELL_ROWS: i32 = 4;
@@ -16,7 +16,7 @@ const CELL_COLS: i32 = 2;
 #[derive(Debug, Clone, PartialEq)]
 pub enum GridGeom<T>
 where
-    T: CoordinateType + Float + RTreeNum + FromPrimitive,
+    T: GeoFloat + RTreeNum + FromPrimitive,
 {
     Point(Point<T>),
     Line(Line<T>),
@@ -25,7 +25,7 @@ where
 
 impl<T> GridGeom<T>
 where
-    T: CoordinateType + Float + RTreeNum + FromPrimitive,
+    T: GeoFloat + RTreeNum + FromPrimitive,
 {
     /// Simplify geometries into component pieces for GridGeom
     pub fn vec_from_geom(geom: Geometry<T>, simplification: T, is_area: bool) -> Vec<GridGeom<T>> {
@@ -81,7 +81,7 @@ where
 
 impl<T> RTreeObject for GridGeom<T>
 where
-    T: CoordinateType + Float + RTreeNum + FromPrimitive,
+    T: GeoFloat + RTreeNum + FromPrimitive,
 {
     type Envelope = AABB<[T; 2]>;
 
@@ -123,7 +123,7 @@ pub fn braille_char(suffix: u32) -> char {
 
 pub struct MapGrid<T>
 where
-    T: Float + RTreeNum + FromPrimitive,
+    T: GeoFloat + RTreeNum + FromPrimitive,
 {
     rows: i32,
     cols: i32,
@@ -135,7 +135,7 @@ where
 
 impl<T> MapGrid<T>
 where
-    T: Float + RTreeNum + FromPrimitive,
+    T: GeoFloat + RTreeNum + FromPrimitive,
 {
     pub fn new(width: f64, height: f64, rtree: RTree<GridGeom<T>>) -> MapGrid<T> {
         let envelope = rtree.root().envelope();
