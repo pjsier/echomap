@@ -25,7 +25,7 @@ csv = "1.1"
 shapefile = { version = "0.2.2", features = ["geo-types"] }
 topojson = "0.5"
 float-cmp = "0.8"
-wkt = { git = "https://github.com/georust/wkt" }
+wkt = "0.9"
 polyline = "0.9"
 kml = "0.3"
 

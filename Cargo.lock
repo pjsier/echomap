@@ -286,9 +286,9 @@ dependencies = [
 
 [[package]]
 name = "geo-types"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a6b362f0f09b4ff7ad8210f806f80ab6d0d895365a6830cb504267aeccfe3f43"
+checksum = "f53acb0efebf761179d5346ab1dc2b3657535d461bde5eaf4465ff7fee7a9a15"
 dependencies = [
  "approx",
  "num-traits",
@@ -611,18 +611,18 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "1.0.21"
+version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "318234ffa22e0920fe9a40d7b8369b5f649d490980cf7aadcf1eb91594869b42"
+checksum = "76cc616c6abf8c8928e2fdcc0dbfab37175edd8fb49a4641066ad1364fdab146"
 dependencies = [
  "thiserror-impl",
 ]
 
 [[package]]
 name = "thiserror-impl"
-version = "1.0.21"
+version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cae2447b6282786c3493999f40a9be2a6ad20cb8bd268b0a0dbf5a065535c0ab"
+checksum = "9be73a2caec27583d0046ef3796c3794f868a5bc813db689eed00c7631275cd1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -721,11 +721,13 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "wkt"
-version = "0.8.0"
-source = "git+https://github.com/georust/wkt#f049273dedf6c9be22dcc9cc2e51dd06e1d5a1da"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2db58416eb6dcf64527a12f9446320386a44e7d282e27af0edb497b1ee03ec9c"
 dependencies = [
  "geo-types",
  "num-traits",
+ "thiserror",
 ]
 
 [[package]]
