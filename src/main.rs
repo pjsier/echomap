@@ -177,7 +177,7 @@ fn handle_csv(input_str: String, lat_col: &str, lon_col: &str) -> Result<Vec<Gri
 }
 
 fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Result<Vec<GridGeom<f64>>> {
-    let rdr = shapefile::Reader::from_path(file_path)
+    let mut rdr = shapefile::ShapeReader::from_path(file_path)
         .with_context(|| format!("There was an error opening shapefile {}", file_path))?;
     Ok(rdr
         .iter_shapes()
