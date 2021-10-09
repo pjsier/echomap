@@ -414,6 +414,22 @@ mod test {
     }
 
     #[test]
+    fn test_handle_shp() {
+        let file_path = "./fixtures/input_point.shp";
+        let points = handle_shp(file_path, 0., false).unwrap();
+        let points = points.iter().filter(|g| matches!(g, GridGeom::Point(_)));
+        let file_path = "./fixtures/input_line.shp";
+        let lines = handle_shp(file_path, 0., false).unwrap();
+        let lines = lines.iter().filter(|g| matches!(g, GridGeom::Line(_)));
+        let file_path = "./fixtures/input_area.shp";
+        let areas = handle_shp(file_path, 0., true).unwrap();
+        let poly = areas.iter().filter(|g| matches!(g, GridGeom::Polygon(_)));
+        assert_eq!(points.count(), 1);
+        assert_eq!(lines.count(), 1);
+        assert_eq!(poly.count(), 3);
+    }
+
+    #[test]
     fn test_handle_wkt() {
         let input_str = include_str!("../fixtures/input.wkt").to_string();
         assert_eq!(
