@@ -18,16 +18,16 @@ geojson = { version = "0.22", features = ["geo-types"] }
 num-traits = "0.2"
 rstar = "0.9"
 anyhow = "1.0"
-console = "0.14"
+console = "0.15"
 indicatif = "0.16"
-clap = "2.33.3"
+clap = "3.0.10"
 csv = "1.1"
 shapefile = { version = "0.3.0", features = ["geo-types"] }
 topojson = "0.5"
 float-cmp = "0.9"
 wkt = "0.9"
 polyline = "0.9"
-kml = "0.3"
+kml = "0.4"
 
 [[bin]]
 name = "echomap"
