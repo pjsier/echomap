@@ -4,7 +4,7 @@ use std::io::{self, Read};
 use std::str::FromStr;
 
 use anyhow::{self, Context, Result};
-use clap::{App, Arg};
+use clap::{Arg, Command};
 use console::Term;
 use geo::{Geometry, Point};
 use geojson::{self, GeoJson};
@@ -228,7 +228,7 @@ fn handle_kml(input_str: String, simplification: f64, is_area: bool) -> Result<V
 }
 
 fn main() -> Result<()> {
-    let matches = App::new(env!("CARGO_PKG_NAME"))
+    let matches = Command::new(env!("CARGO_PKG_NAME"))
         .version(env!("CARGO_PKG_VERSION"))
         .about(env!("CARGO_PKG_DESCRIPTION"))
         .arg(Arg::new("INPUT")
