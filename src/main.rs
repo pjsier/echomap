@@ -59,7 +59,7 @@ fn get_file_format(file_path: &str, file_format: Option<&str>) -> Result<InputFo
 fn get_simplification(simplify: &str) -> Result<f64> {
     if simplify.contains('%') {
         let simplify = simplify
-            .replace("%", "")
+            .replace('%', "")
             .parse::<f64>()
             .with_context(|| format!("Could not parse simplify value: {}", simplify))?;
         Ok(simplify / 100.)
@@ -192,12 +192,14 @@ fn handle_shp(file_path: &str, simplification: f64, is_area: bool) -> Result<Vec
 fn handle_wkt(input_str: String, simplification: f64, is_area: bool) -> Result<Vec<GridGeom<f64>>> {
     let wkt = Wkt::<f64>::from_str(&input_str)
         .map_err(|_| anyhow::anyhow!("There was an error parsing WKT"))?;
-    Ok(wkt
-        .items
-        .into_iter()
-        .filter_map(|s| s.try_into().ok())
-        .flat_map(|geo| GridGeom::<f64>::vec_from_geom(geo, simplification, is_area))
-        .collect())
+    let geom: Geometry<f64> = wkt
+        .try_into()
+        .map_err(|_| anyhow::anyhow!("There was an error converting WKT"))?;
+    Ok(GridGeom::<f64>::vec_from_geom(
+        geom,
+        simplification,
+        is_area,
+    ))
 }
 
 fn handle_polyline(
