@@ -388,9 +388,9 @@ checksum = "1aab8fc367588b89dcee83ab0fd66b72b50b72fa1904d7095045ace2b0c81c35"
 
 [[package]]
 name = "kml"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6f60394df46c3edec847fc47f42b00e7b5112a2d30bbe24f029ac2e87b960db7"
+checksum = "99887fe7b1760399f310d8f3895c3f41409947129c19f4dae31529ee2a7ae6f1"
 dependencies = [
  "geo-types",
  "num-traits",
@@ -508,9 +508,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.20.0"
+version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26aab6b48e2590e4a64d1ed808749ba06257882b461d01ca71baeb747074a6dd"
+checksum = "8533f14c8382aaad0d592c812ac3b826162128b65662331e1127b45c3d18536b"
 dependencies = [
  "memchr",
 ]
