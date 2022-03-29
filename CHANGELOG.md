@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## [v0.7.0](https://github.com/pjsier/echomap/releases/tag/v0.7.0)
+
+- Multiple dependency updates, including refactoring for `clap`
+- Use `FeatureIterator` from [`geojson` v0.22.3](https://github.com/georust/geojson/releases/tag/0.22.3) to reduce memory consumption and runtime significantly for extremely large GeoJSON files
+
 ## [v0.6.2](https://github.com/pjsier/echomap/releases/tag/v0.6.2)
 
 - Add test for shapefiles ([#21](https://github.com/pjsier/echomap/pull/21)) from [@niwa-s](https://github.com/niwa-s)
