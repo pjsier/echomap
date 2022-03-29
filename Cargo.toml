@@ -14,7 +14,7 @@ exclude = [".github/*", "img/*", "fixtures/*"]
 [dependencies]
 geo = "0.19"
 geo-types = { version = "0.7", features = ["rstar"] }
-geojson = { version = "0.22", features = ["geo-types"] }
+geojson = { version = "0.22.3", features = ["geo-types"] }
 num-traits = "0.2"
 rstar = "0.9"
 anyhow = "1.0"
@@ -27,7 +27,7 @@ topojson = "0.5"
 float-cmp = "0.9"
 wkt = "0.10"
 polyline = "0.9"
-kml = "0.4"
+kml = "0.4.2"
 
 [[bin]]
 name = "echomap"

@@ -1,13 +1,13 @@
 use std::convert::{TryFrom, TryInto};
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, BufReader, Read};
 use std::str::FromStr;
 
 use anyhow::{self, Context, Result};
 use clap::{Arg, Command};
 use console::Term;
 use geo::{Geometry, Point};
-use geojson::{self, GeoJson};
+use geojson::{self, FeatureIterator, GeoJson};
 use indicatif::ProgressBar;
 use kml::{quick_collection, Kml};
 use polyline::decode_polyline;
@@ -113,14 +113,20 @@ pub fn process_geojson(gj: GeoJson, simplification: f64, is_area: bool) -> Vec<G
 }
 
 fn handle_geojson(
-    input_str: String,
+    file_path: &str,
     simplification: f64,
     is_area: bool,
 ) -> Result<Vec<GridGeom<f64>>> {
-    let gj: GeoJson = input_str
-        .parse::<GeoJson>()
-        .context("Unable to parse GeoJSON")?;
-    Ok(process_geojson(gj, simplification, is_area))
+    Ok(match file_path {
+        "-" => FeatureIterator::new(BufReader::new(io::stdin()))
+            .filter_map(|f| f.ok())
+            .flat_map(|f| process_geojson(GeoJson::Feature(f), simplification, is_area))
+            .collect(),
+        _ => FeatureIterator::new(BufReader::new(fs::File::open(file_path)?))
+            .filter_map(|f| f.ok())
+            .flat_map(|f| process_geojson(GeoJson::Feature(f), simplification, is_area))
+            .collect(),
+    })
 }
 
 fn handle_topojson(
@@ -316,7 +322,7 @@ fn main() -> Result<()> {
 
     let geoms: Vec<GridGeom<f64>> = match file_format {
         InputFormat::GeoJson => handle_geojson(
-            read_input_to_string(matches.value_of("INPUT").unwrap())?,
+            matches.value_of("INPUT").unwrap(),
             simplification,
             matches.is_present("area"),
         ),
@@ -379,10 +385,10 @@ mod test {
 
     #[test]
     fn test_handle_geojson() {
-        let input_str = include_str!("../fixtures/input.geojson").to_string();
-        let outlines = handle_geojson(input_str.clone(), 0., false).unwrap();
+        let file_path = "../fixtures/input.geojson";
+        let outlines = handle_geojson(file_path, 0., false).unwrap();
         let lines = outlines.iter().filter(|g| matches!(g, GridGeom::Line(_)));
-        let areas = handle_geojson(input_str, 0., true).unwrap();
+        let areas = handle_geojson(file_path, 0., true).unwrap();
         let poly = areas.iter().filter(|g| matches!(g, GridGeom::Polygon(_)));
         assert_eq!(outlines.len(), 14);
         assert_eq!(lines.count(), 13);
