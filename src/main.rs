@@ -385,7 +385,7 @@ mod test {
 
     #[test]
     fn test_handle_geojson() {
-        let file_path = "../fixtures/input.geojson";
+        let file_path = "./fixtures/input.geojson";
         let outlines = handle_geojson(file_path, 0., false).unwrap();
         let lines = outlines.iter().filter(|g| matches!(g, GridGeom::Line(_)));
         let areas = handle_geojson(file_path, 0., true).unwrap();
