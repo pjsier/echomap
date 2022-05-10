@@ -995,9 +995,9 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "wkt"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98cef6f728777a2d2f23ab1696c4810a2e4575e5833df2ea36bb3f69e4db4f4e"
+checksum = "6af44da55a2358b048c835ea3ff7cf41a7a27a273c974afd37dcf558eea886e1"
 dependencies = [
  "geo-types",
  "num-traits",
