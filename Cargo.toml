@@ -7,7 +7,7 @@ readme = "README.md"
 homepage = "https://github.com/pjsier/echomap"
 repository = "https://github.com/pjsier/echomap"
 license = "MIT"
-edition = "2018"
+edition = "2021"
 keywords = ["geo", "map", "gis", "cli"]
 exclude = [".github/*", "img/*", "fixtures/*"]
 
