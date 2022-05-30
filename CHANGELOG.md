@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## [v0.7.2](https://github.com/pjsier/echomap/releases/tag/v0.7.2)
+
+- Update to use Rust 2021 edition
+- Multiple dependency updates
+
 ## [v0.7.1](https://github.com/pjsier/echomap/releases/tag/v0.7.1)
 
 - Use `FeatureIterator` from [`geojson` v0.22.3](https://github.com/georust/geojson/releases/tag/0.22.3) to reduce memory consumption and runtime significantly for extremely large GeoJSON files
