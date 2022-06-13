@@ -331,6 +331,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "float_next_after"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4fc612c5837986b7104a87a0df74a5460931f1c5274be12f8d0f40aa2f30d632"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.12.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -360,16 +369,17 @@ dependencies = [
 
 [[package]]
 name = "geo"
-version = "0.20.1"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7e2e3be15682a45e9dfe9a04f84bff275390047204ab22f3c6b2312fcfb9e24"
+checksum = "20f1cd8cc66ae5c52a2b9328e3562adde921b203a10d6ea0ac24c349de4c42c4"
 dependencies = [
+ "float_next_after",
  "geo-types",
  "geographiclib-rs",
  "log",
  "num-traits",
  "robust",
- "rstar 0.8.4",
+ "rstar 0.9.3",
 ]
 
 [[package]]
@@ -381,6 +391,7 @@ dependencies = [
  "approx",
  "num-traits",
  "rstar 0.8.4",
+ "rstar 0.9.3",
 ]
 
 [[package]]

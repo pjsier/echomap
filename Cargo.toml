@@ -12,7 +12,7 @@ keywords = ["geo", "map", "gis", "cli"]
 exclude = [".github/*", "img/*", "fixtures/*"]
 
 [dependencies]
-geo = "0.20"
+geo = "0.21"
 geo-types = { version = "0.7", features = ["rstar"] }
 geojson = { version = "0.22.4", features = ["geo-types"] }
 num-traits = "0.2"
