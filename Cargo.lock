@@ -282,7 +282,7 @@ dependencies = [
  "float-cmp",
  "geo",
  "geo-types",
- "geojson 0.23.0",
+ "geojson",
  "indicatif",
  "kml",
  "num-traits",
@@ -401,18 +401,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b78e20d5d868fa2c4182a8170cb4df261e781a605810e3c1500269c1907da461"
 dependencies = [
  "lazy_static",
-]
-
-[[package]]
-name = "geojson"
-version = "0.22.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05d90d17275f3d3d1c6e64d2703e2667f875e2bb80437e4675537f87fec0f07c"
-dependencies = [
- "serde",
- "serde_derive",
- "serde_json",
- "thiserror",
 ]
 
 [[package]]
@@ -930,11 +918,11 @@ dependencies = [
 
 [[package]]
 name = "topojson"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d9e0f9fb0843004d5da89d4763d15a2bba575b80e4907a5bb77a30395b854eb"
+checksum = "41ed0491c918a501d49a5da86736c9e27666b6f5794fadec0ff8d4842c642b73"
 dependencies = [
- "geojson 0.22.4",
+ "geojson",
  "log",
  "serde",
  "serde_json",

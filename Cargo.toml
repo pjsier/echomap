@@ -23,7 +23,7 @@ indicatif = "0.16"
 clap = "3.1.18"
 csv = "1.1"
 shapefile = { version = "0.3.0", features = ["geo-types"] }
-topojson = "0.5"
+topojson = "0.5.1"
 float-cmp = "0.9"
 wkt = "0.10"
 polyline = "0.9"
