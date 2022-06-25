@@ -405,9 +405,9 @@ dependencies = [
 
 [[package]]
 name = "geojson"
-version = "0.22.4"
+version = "0.23.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05d90d17275f3d3d1c6e64d2703e2667f875e2bb80437e4675537f87fec0f07c"
+checksum = "f3c1147be22f66284de4387c43e4abab872e525a528f4d0af4e4e0f231895ea4"
 dependencies = [
  "geo-types",
  "serde",
@@ -918,9 +918,9 @@ dependencies = [
 
 [[package]]
 name = "topojson"
-version = "0.5.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9d9e0f9fb0843004d5da89d4763d15a2bba575b80e4907a5bb77a30395b854eb"
+checksum = "41ed0491c918a501d49a5da86736c9e27666b6f5794fadec0ff8d4842c642b73"
 dependencies = [
  "geojson",
  "log",

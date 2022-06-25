@@ -14,7 +14,7 @@ exclude = [".github/*", "img/*", "fixtures/*"]
 [dependencies]
 geo = "0.21"
 geo-types = { version = "0.7", features = ["rstar"] }
-geojson = { version = "0.22.4", features = ["geo-types"] }
+geojson = { version = "0.23.0", features = ["geo-types"] }
 num-traits = "0.2"
 rstar = "0.9"
 anyhow = "1.0"
@@ -23,7 +23,7 @@ indicatif = "0.16"
 clap = "3.2.5"
 csv = "1.1"
 shapefile = { version = "0.3.0", features = ["geo-types"] }
-topojson = "0.5"
+topojson = "0.5.1"
 float-cmp = "0.9"
 wkt = "0.10"
 polyline = "0.9"
