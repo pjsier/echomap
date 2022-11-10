@@ -4,7 +4,7 @@ use std::io::{self, BufReader, Read};
 use std::str::FromStr;
 
 use anyhow::{self, Context, Result};
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 use console::Term;
 use geo::{Geometry, Point};
 use geojson::{self, FeatureIterator, GeoJson};
@@ -47,10 +47,10 @@ impl FromStr for InputFormat {
 }
 
 /// Get file format from flag or infer from file path
-fn get_file_format(file_path: &str, file_format: Option<&str>) -> Result<InputFormat> {
+fn get_file_format(file_path: &str, file_format: Option<String>) -> Result<InputFormat> {
     let format_str = match file_format {
         Some(f) => f,
-        None => file_path.split('.').last().unwrap(),
+        None => file_path.split('.').last().unwrap().to_string(),
     };
     format_str.parse()
 }
@@ -248,58 +248,52 @@ fn main() -> Result<()> {
             .long("format")
             .value_name("FORMAT")
             .help("Input file format (tries to infer from file extension by default)")
-            .possible_values(&["geojson", "topojson", "csv", "shp", "wkt", "polyline", "kml"])
-            .default_value_if("INPUT", Some("-"), Some("geojson"))
-            .takes_value(true))
+            .value_parser(["geojson", "topojson", "csv", "shp", "wkt", "polyline", "kml"])
+            .default_value_if("INPUT", "-", Some("geojson")))
         .arg(Arg::new("lon")
             .long("lon")
             .value_name("LON")
-            .takes_value(true)
             .help("Name of longitude column (if format is 'csv')")
             .default_value("lon"))
         .arg(Arg::new("lat")
             .long("lat")
             .value_name("LAT")
-            .takes_value(true)
             .help("Name of latitude column (if format is 'csv')")
             .default_value("lat"))
         .arg(Arg::new("rows")
             .short('r')
             .long("rows")
             .value_name("ROWS")
-            .help("Sets the number of rows (in characters) of the printed output. Defaults to terminal width.")
-            .takes_value(true))
+            .help("Sets the number of rows (in characters) of the printed output. Defaults to terminal width."))
         .arg(Arg::new("columns")
             .short('c')
             .long("columns")
             .value_name("COLUMNS")
-            .help("Sets the number of columns (in characters) of the printed output. Defaults to terminal height minus 1.")
-            .takes_value(true))
+            .help("Sets the number of columns (in characters) of the printed output. Defaults to terminal height minus 1."))
         .arg(Arg::new("simplify")
             .short('s')
             .long("simplify")
             .help("Proportion of removable points to remove (0-1 or 0%-100%)")
-            .takes_value(true)
             .default_value("0.01"))
         .arg(Arg::new("precision")
             .long("precision")
             .help("Precision value for polyline parsing")
-            .required_if_eq("format", "polyline")
-            .takes_value(true))
+            .required_if_eq("format", "polyline"))
         .arg(Arg::new("area")
             .short('a')
             .long("area")
+            .action(ArgAction::SetTrue)
             .help("Print polygon area instead of boundaries"))
         .get_matches();
 
     let (term_height, term_width) = Term::stdout().size();
-    let height: f64 = match matches.value_of("rows") {
+    let height: f64 = match matches.get_one::<String>("rows") {
         Some(ref rows) => rows
             .parse()
             .with_context(|| format!("Rows value {} cannot be parsed as a number", rows)),
         None => Ok(f64::from(term_height - 1)),
     }?;
-    let width: f64 = match matches.value_of("columns") {
+    let width: f64 = match matches.get_one::<String>("columns") {
         Some(ref cols) => cols
             .parse()
             .with_context(|| format!("Columns value {} cannot be parsed as a number", cols)),
@@ -307,7 +301,7 @@ fn main() -> Result<()> {
     }?;
 
     // Simplification is scaled by the output size
-    let simplify = get_simplification(matches.value_of("simplify").unwrap())?;
+    let simplify = get_simplification(matches.get_one::<String>("simplify").unwrap())?;
     let simplification = simplify / (height * width);
 
     let spinner = ProgressBar::new_spinner();
@@ -316,45 +310,45 @@ fn main() -> Result<()> {
     spinner.set_message("Parsing geography");
 
     let file_format = get_file_format(
-        matches.value_of("INPUT").unwrap(),
-        matches.value_of("format"),
+        matches.get_one::<String>("INPUT").unwrap(),
+        matches.get_one::<String>("format").cloned(),
     )?;
 
     let geoms: Vec<GridGeom<f64>> = match file_format {
         InputFormat::GeoJson => handle_geojson(
-            matches.value_of("INPUT").unwrap(),
+            matches.get_one::<String>("INPUT").unwrap(),
             simplification,
-            matches.is_present("area"),
+            matches.get_flag("area"),
         ),
         InputFormat::TopoJson => handle_topojson(
-            read_input_to_string(matches.value_of("INPUT").unwrap())?,
+            read_input_to_string(matches.get_one::<String>("INPUT").unwrap())?,
             simplification,
-            matches.is_present("area"),
+            matches.get_flag("area"),
         ),
         InputFormat::Csv => handle_csv(
-            read_input_to_string(matches.value_of("INPUT").unwrap())?,
-            matches.value_of("lat").unwrap(),
-            matches.value_of("lon").unwrap(),
+            read_input_to_string(matches.get_one::<String>("INPUT").unwrap())?,
+            matches.get_one::<String>("lat").unwrap(),
+            matches.get_one::<String>("lon").unwrap(),
         ),
         InputFormat::Shapefile => handle_shp(
-            matches.value_of("INPUT").unwrap(),
+            matches.get_one::<String>("INPUT").unwrap(),
             simplification,
-            matches.is_present("area"),
+            matches.get_flag("area"),
         ),
         InputFormat::Wkt => handle_wkt(
-            read_input_to_string(matches.value_of("INPUT").unwrap())?,
+            read_input_to_string(matches.get_one::<String>("INPUT").unwrap())?,
             simplification,
-            matches.is_present("area"),
+            matches.get_flag("area"),
         ),
         InputFormat::Polyline => handle_polyline(
-            read_input_to_string(matches.value_of("INPUT").unwrap())?,
-            matches.value_of("precision").unwrap(),
+            read_input_to_string(matches.get_one::<String>("INPUT").unwrap())?,
+            matches.get_one::<String>("precision").unwrap(),
             simplification,
         ),
         InputFormat::Kml => handle_kml(
-            read_input_to_string(matches.value_of("INPUT").unwrap())?,
+            read_input_to_string(matches.get_one::<String>("INPUT").unwrap())?,
             simplification,
-            matches.is_present("area"),
+            matches.get_flag("area"),
         ),
     }?;
 
@@ -378,7 +372,7 @@ mod test {
             Ok(InputFormat::GeoJson)
         ));
         assert!(matches!(
-            get_file_format("test.geojson", Some("csv")),
+            get_file_format("test.geojson", Some("csv".to_string())),
             Ok(InputFormat::Csv)
         ));
     }
