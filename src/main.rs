@@ -2,6 +2,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fs;
 use std::io::{self, BufReader, Read};
 use std::str::FromStr;
+use std::time::Duration;
 
 use anyhow::{self, Context, Result};
 use clap::{Arg, ArgAction, Command};
@@ -306,7 +307,7 @@ fn main() -> Result<()> {
 
     let spinner = ProgressBar::new_spinner();
     spinner.set_message("Reading file");
-    spinner.enable_steady_tick(1);
+    spinner.enable_steady_tick(Duration::from_millis(100));
     spinner.set_message("Parsing geography");
 
     let file_format = get_file_format(
