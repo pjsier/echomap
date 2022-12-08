@@ -27,7 +27,7 @@ topojson = "0.5.1"
 float-cmp = "0.9"
 wkt = "0.10"
 polyline = "0.9"
-kml = "0.4.3"
+kml = "0.6.0"
 
 [[bin]]
 name = "echomap"
