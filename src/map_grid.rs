@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use geo::algorithm::bounding_rect::BoundingRect;
 use geo::algorithm::contains::Contains;
 use geo::algorithm::intersects::Intersects;
-use geo::algorithm::simplifyvw::SimplifyVW;
+use geo::algorithm::simplify_vw::SimplifyVw;
 use geo::{GeoFloat, Geometry, Line, Point, Polygon, Rect};
 use num_traits::FromPrimitive;
 use rstar::{self, RTree, RTreeNum, RTreeObject, AABB};
@@ -34,21 +34,21 @@ where
             Geometry::MultiPoint(s) => s.into_iter().map(GridGeom::Point).collect(),
             Geometry::Line(s) => vec![GridGeom::Line(s); 1],
             Geometry::LineString(s) => s
-                .simplifyvw(&simplification)
+                .simplify_vw(&simplification)
                 .lines()
                 .map(GridGeom::Line)
                 .collect(),
             Geometry::MultiLineString(s) => s
                 .into_iter()
-                .map(|ls| ls.simplifyvw(&simplification))
+                .map(|ls| ls.simplify_vw(&simplification))
                 .flat_map(|ls| ls.lines().collect::<Vec<_>>())
                 .map(GridGeom::Line)
                 .collect(),
             Geometry::Polygon(s) => {
                 if is_area {
-                    vec![GridGeom::Polygon(s.simplifyvw(&simplification)); 1]
+                    vec![GridGeom::Polygon(s.simplify_vw(&simplification)); 1]
                 } else {
-                    s.simplifyvw(&simplification)
+                    s.simplify_vw(&simplification)
                         .exterior()
                         .lines()
                         .map(GridGeom::Line)
@@ -57,12 +57,12 @@ where
             }
             Geometry::MultiPolygon(s) => {
                 if is_area {
-                    s.simplifyvw(&simplification)
+                    s.simplify_vw(&simplification)
                         .into_iter()
                         .map(GridGeom::Polygon)
                         .collect()
                 } else {
-                    s.simplifyvw(&simplification)
+                    s.simplify_vw(&simplification)
                         .into_iter()
                         .flat_map(|p| p.exterior().lines().collect::<Vec<_>>())
                         .map(GridGeom::Line)
