@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [v0.7.3](https://github.com/pjsier/echomap/releases/tag/v0.7.3)
+
+- Multiple dependency updates to fix failing installs
+
 ## [v0.7.2](https://github.com/pjsier/echomap/releases/tag/v0.7.2)
 
 - Update to use Rust 2021 edition
